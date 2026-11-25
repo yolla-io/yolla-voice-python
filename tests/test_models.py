@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
 
 from yolla_voice import models
 from yolla_voice.generated.models import ListCallsResponse
@@ -8,14 +9,24 @@ from yolla_voice.models import Call, CallList, CallStatus, CreateCallRequest, Mo
 
 
 def test_request_uses_python_names_and_wire_aliases():
-    request = CreateCallRequest(to="+14155550100", from_="+14155550199", external_user_id="u1")
+    request = CreateCallRequest(to="14155550100", from_="14155550199", external_user_id="u1")
     assert request.model_dump(by_alias=True, exclude_unset=True) == {
-        "to": "+14155550100",
-        "from": "+14155550199",
+        "to": "14155550100",
+        "from": "14155550199",
         "externalUserId": "u1",
     }
     assert request.model_config["populate_by_name"] is True
     assert request.model_config["extra"] == "allow"
+
+
+def test_request_rejects_leading_plus_destination():
+    with pytest.raises(ValidationError, match="String should match pattern"):
+        CreateCallRequest(to="+14155550100", external_user_id="u1")
+
+
+def test_request_rejects_leading_plus_e164():
+    with pytest.raises(ValidationError, match="String should match pattern"):
+        CreateCallRequest(to="14155550100", from_="+14155550199", external_user_id="u1")
 
 
 def test_unknown_enum_value_survives():
@@ -34,8 +45,8 @@ def test_datetime_fields_are_timezone_aware():
         {
             "id": "call_1",
             "status": "created",
-            "to": "+14155550100",
-            "from": "+14155550199",
+            "to": "14155550100",
+            "from": "14155550199",
             "externalUserId": "u1",
             "createdAt": "2026-11-25T12:00:00Z",
             "expiresAt": "2026-11-25T13:00:00+00:00",

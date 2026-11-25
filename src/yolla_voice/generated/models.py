@@ -64,11 +64,11 @@ CustomParamsAdditionalProperty = TypeAliasType(
 
 
 class Destination(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[+]?[1-9][0-9]{3,14}$")]
+    root: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
 
 
 class E164(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[+]?[1-9][0-9]{6,14}$")]
+    root: Annotated[str, Field(pattern="^[1-9][0-9]{6,14}$")]
 
 
 class EndReason(OpenEnum):
