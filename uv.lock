@@ -315,6 +315,14 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/f4/372168159af2ea65492e571b6f280431f2b0be2eebb32ed96d943c1e4ebb/datamodel_code_generator-0.102.0-py3-none-any.whl", hash = "sha256:d6b7fad258ba81d30fbef689feb16587033d07c225cef3d94c8fc6164af7e828", size = 2611183, upload-time = "2026-11-25T00:45:16.17Z" },
 ]
 
+[package.optional-dependencies]
+jinja2 = [
+    { name = "jinja2" },
+]
+ruff = [
+    { name = "ruff" },
+]
+
 [[package]]
 name = "genson"
 version = "1.4.0"
@@ -1153,7 +1161,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage" },
-    { name = "datamodel-code-generator" },
+    { name = "datamodel-code-generator", extra = ["jinja2", "ruff"] },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1170,7 +1178,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", specifier = ">=7.6" },
-    { name = "datamodel-code-generator", specifier = ">=0.26" },
+    { name = "datamodel-code-generator", extras = ["jinja2", "ruff"], specifier = ">=0.26" },
     { name = "mypy", specifier = ">=1.13" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
