@@ -85,6 +85,96 @@ def test_strip_prose_removes_documentation_and_adds_required_fields() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("property_name", "property_schema", "expected_schema"),
+    [
+        (
+            "properties",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {"description": {"type": "string", "description": "Nested metadata"}},
+            },
+            {"type": "object", "properties": {"description": {"type": "string"}}},
+        ),
+        (
+            "responses",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {"id": {"type": "string", "description": "Nested metadata"}},
+            },
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+        ),
+        (
+            "paths",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {
+                    "post": {
+                        "type": "object",
+                        "operationId": "schemaOperation",
+                        "description": "Nested metadata",
+                    }
+                },
+            },
+            {
+                "type": "object",
+                "properties": {"post": {"type": "object", "operationId": "schemaOperation"}},
+            },
+        ),
+    ],
+)
+def test_strip_prose_does_not_treat_property_names_as_structure(
+    property_name: str, property_schema: dict[str, Any], expected_schema: dict[str, Any]
+) -> None:
+    document = {"type": "object", "properties": {property_name: property_schema}}
+
+    assert sync_contract.strip_prose(document) == {
+        "type": "object",
+        "properties": {property_name: expected_schema},
+    }
+
+
+def test_strip_prose_adds_operation_summaries_in_all_path_item_locations() -> None:
+    document = {
+        "webhooks": {
+            "call.created": {
+                "post": {
+                    "operationId": "webhookCreated",
+                    "summary": "Webhook prose",
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        },
+        "components": {
+            "pathItems": {
+                "CallWebhook": {
+                    "post": {
+                        "operationId": "reusableWebhook",
+                        "summary": "Reusable prose",
+                        "responses": {"200": {"description": "Success"}},
+                    }
+                }
+            }
+        },
+    }
+
+    stripped = sync_contract.strip_prose(document)
+
+    assert stripped["webhooks"]["call.created"]["post"] == {
+        "operationId": "webhookCreated",
+        "summary": "webhookCreated",
+        "responses": {"200": {"description": "Response"}},
+    }
+    assert stripped["components"]["pathItems"]["CallWebhook"]["post"] == {
+        "operationId": "reusableWebhook",
+        "summary": "reusableWebhook",
+        "responses": {"200": {"description": "Response"}},
+    }
+
+
 def test_sync_contract_has_stable_header_key_order_and_unwrapped_scalars(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

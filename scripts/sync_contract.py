@@ -3,6 +3,7 @@ import re
 import subprocess
 import sys
 from datetime import date
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
@@ -14,31 +15,56 @@ _OPERATION_KEYS = frozenset({"get", "put", "post", "delete", "options", "head", 
 _CYRILLIC_RE = re.compile(r"[\u0400-\u04ff\u0500-\u052f\u2de0-\u2dff\ua640-\ua69f]")
 
 
+class _Context(Enum):
+    DEFAULT = auto()
+    PROPERTIES = auto()
+    RESPONSES = auto()
+    PATHS = auto()
+    PATH_ITEM = auto()
+
+
+def _context_for_key(key: Any) -> _Context:
+    if key == "properties":
+        return _Context.PROPERTIES
+    if key == "responses":
+        return _Context.RESPONSES
+    if key in {"paths", "webhooks", "pathItems"}:
+        return _Context.PATHS
+    return _Context.DEFAULT
+
+
 def strip_prose(node: Any, parent_key: str | None = None) -> Any:
+    return _strip_prose(node, _context_for_key(parent_key))
+
+
+def _strip_prose(node: Any, context: _Context) -> Any:
     if isinstance(node, dict):
-        stripped = {
-            key: strip_prose(value, key)
-            for key, value in node.items()
-            if parent_key == "properties" or key not in _PROSE_KEYS
-        }
-        if parent_key == "responses":
+        stripped = {}
+        for key, value in node.items():
+            if context is not _Context.PROPERTIES and key in _PROSE_KEYS:
+                continue
+            if context is _Context.PROPERTIES:
+                child_context = _Context.DEFAULT
+            elif context is _Context.PATHS:
+                child_context = _Context.PATH_ITEM
+            else:
+                child_context = _context_for_key(key)
+            stripped[key] = _strip_prose(value, child_context)
+        if context is _Context.RESPONSES:
             for response in stripped.values():
                 if isinstance(response, dict):
                     response["description"] = "Response"
-        elif parent_key == "paths":
-            for path_item in stripped.values():
-                if not isinstance(path_item, dict):
-                    continue
-                for method, operation in path_item.items():
-                    if (
-                        method in _OPERATION_KEYS
-                        and isinstance(operation, dict)
-                        and "operationId" in operation
-                    ):
-                        operation["summary"] = operation["operationId"]
+        elif context is _Context.PATH_ITEM:
+            for method, operation in stripped.items():
+                if (
+                    method in _OPERATION_KEYS
+                    and isinstance(operation, dict)
+                    and "operationId" in operation
+                ):
+                    operation["summary"] = operation["operationId"]
         return stripped
     if isinstance(node, list):
-        return [strip_prose(item, parent_key) for item in node]
+        return [_strip_prose(item, context) for item in node]
     return node
 
 
