@@ -40,6 +40,16 @@ async def _run_lifespan(receive: _Receive, send: _Send) -> None:
             return
 
 
+class _ASGIWebhookApp:
+    # A callable object rather than a function: routers such as Starlette's `Route` treat
+    # plain functions as request handlers, but mount any other callable as an ASGI app.
+    def __init__(self, app: _ASGIApplication) -> None:
+        self._app = app
+
+    async def __call__(self, scope: _Scope, receive: _Receive, send: _Send) -> None:
+        await self._app(scope, receive, send)
+
+
 def create_asgi_app(
     dispatcher: AsyncWebhookDispatcher,
     *,
@@ -92,7 +102,7 @@ def create_asgi_app(
         response = await dispatcher.handle(bytes(body), headers)
         await _send_response(send, response.status, response.body)
 
-    return app
+    return _ASGIWebhookApp(app)
 
 
 __all__ = ["create_asgi_app"]

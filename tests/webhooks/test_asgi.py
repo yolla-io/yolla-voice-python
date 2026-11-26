@@ -1,3 +1,4 @@
+import inspect
 import time
 
 import yolla_voice
@@ -254,3 +255,11 @@ async def test_websocket_scope_is_closed_with_policy_violation():
     await app({"type": "websocket", "headers": []}, scripted_receive([]), send)
 
     assert sent == [{"type": "websocket.close", "code": 1008}]
+
+
+def test_asgi_app_is_a_callable_object_so_routers_mount_it_as_asgi():
+    app = create_asgi_app(AsyncWebhookDispatcher(secret=SECRET))
+
+    assert callable(app)
+    assert not inspect.isfunction(app)
+    assert not inspect.ismethod(app)
