@@ -1,0 +1,222 @@
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml  # type: ignore[import-untyped]
+
+from scripts import sync_contract
+
+MINIMAL_DOCUMENT: dict[str, Any] = {
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Calls API",
+        "version": "1.2.3",
+        "description": "Info prose",
+    },
+    "x-mvp": {"owner": "team"},
+    "paths": {
+        "/calls": {
+            "post": {
+                "operationId": "createCall",
+                "summary": "Create a call",
+                "description": "Operation prose",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Property prose",
+                                    }
+                                },
+                            },
+                            "example": {"description": "value"},
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"},
+                                "examples": {"ok": {"value": {"id": "call_1"}}},
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    },
+}
+
+
+def test_strip_prose_removes_documentation_and_adds_required_fields() -> None:
+    assert sync_contract.strip_prose(MINIMAL_DOCUMENT) == {
+        "openapi": "3.1.0",
+        "info": {"title": "Calls API", "version": "1.2.3"},
+        "paths": {
+            "/calls": {
+                "post": {
+                    "operationId": "createCall",
+                    "summary": "createCall",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"description": {"type": "string"}},
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Response",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            }
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("property_name", "property_schema", "expected_schema"),
+    [
+        (
+            "properties",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {"description": {"type": "string", "description": "Nested metadata"}},
+            },
+            {"type": "object", "properties": {"description": {"type": "string"}}},
+        ),
+        (
+            "responses",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {"id": {"type": "string", "description": "Nested metadata"}},
+            },
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+        ),
+        (
+            "paths",
+            {
+                "type": "object",
+                "description": "Property metadata",
+                "properties": {
+                    "post": {
+                        "type": "object",
+                        "operationId": "schemaOperation",
+                        "description": "Nested metadata",
+                    }
+                },
+            },
+            {
+                "type": "object",
+                "properties": {"post": {"type": "object", "operationId": "schemaOperation"}},
+            },
+        ),
+    ],
+)
+def test_strip_prose_does_not_treat_property_names_as_structure(
+    property_name: str, property_schema: dict[str, Any], expected_schema: dict[str, Any]
+) -> None:
+    document = {"type": "object", "properties": {property_name: property_schema}}
+
+    assert sync_contract.strip_prose(document) == {
+        "type": "object",
+        "properties": {property_name: expected_schema},
+    }
+
+
+def test_strip_prose_adds_operation_summaries_in_all_path_item_locations() -> None:
+    document = {
+        "webhooks": {
+            "call.created": {
+                "post": {
+                    "operationId": "webhookCreated",
+                    "summary": "Webhook prose",
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        },
+        "components": {
+            "pathItems": {
+                "CallWebhook": {
+                    "post": {
+                        "operationId": "reusableWebhook",
+                        "summary": "Reusable prose",
+                        "responses": {"200": {"description": "Success"}},
+                    }
+                }
+            }
+        },
+    }
+
+    stripped = sync_contract.strip_prose(document)
+
+    assert stripped["webhooks"]["call.created"]["post"] == {
+        "operationId": "webhookCreated",
+        "summary": "webhookCreated",
+        "responses": {"200": {"description": "Response"}},
+    }
+    assert stripped["components"]["pathItems"]["CallWebhook"]["post"] == {
+        "operationId": "reusableWebhook",
+        "summary": "reusableWebhook",
+        "responses": {"200": {"description": "Response"}},
+    }
+
+
+def test_sync_contract_has_stable_header_key_order_and_unwrapped_scalars(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = {
+        **MINIMAL_DOCUMENT,
+        "info": {**MINIMAL_DOCUMENT["info"], "x-long": "a" * 200},
+    }
+    source = tmp_path / "source.yaml"
+    output = tmp_path / "snapshot.yaml"
+    source.write_text(yaml.safe_dump(document, sort_keys=True), encoding="utf-8")
+    monkeypatch.setattr(sync_contract, "_source_commit", lambda _source: "abc123-dirty")
+
+    sync_contract.sync_contract(source, output, today=date(2026, 1, 2))
+    first = output.read_bytes()
+    sync_contract.sync_contract(source, output, today=date(2026, 1, 2))
+
+    assert output.read_bytes() == first
+    text = first.decode("utf-8")
+    assert text.startswith(
+        "# Generated by scripts/sync_contract.py; do not edit.\n"
+        "# Source contract version: 1.2.3\n"
+        "# Source commit: abc123-dirty\n"
+        "# Sync date: 2026-01-02\n"
+    )
+    assert text.index("\ninfo:") < text.index("\nopenapi:") < text.index("\npaths:")
+    assert f"x-long: {'a' * 200}\n" in text
+
+
+def test_sync_contract_rejects_remaining_cyrillic_without_writing_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = {
+        **MINIMAL_DOCUMENT,
+        "info": {**MINIMAL_DOCUMENT["info"], "title": "\u041f\u0440\u0438\u0432\u0435\u0442"},
+    }
+    source = tmp_path / "source.yaml"
+    output = tmp_path / "snapshot.yaml"
+    source.write_text(yaml.safe_dump(document, sort_keys=True), encoding="utf-8")
+    output.write_text("existing\n", encoding="utf-8")
+    monkeypatch.setattr(sync_contract, "_source_commit", lambda _source: "abc123")
+
+    with pytest.raises(ValueError, match="Cyrillic"):
+        sync_contract.sync_contract(source, output, today=date(2026, 1, 2))
+
+    assert output.read_text(encoding="utf-8") == "existing\n"

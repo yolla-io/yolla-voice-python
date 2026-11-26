@@ -1,0 +1,6 @@
+model_config = ConfigDict(
+{%- for field_name, value in config_items if field_name != 'extra' %}
+    {{ field_name }}={{ value }},
+{%- endfor %}
+    extra="allow",
+)
