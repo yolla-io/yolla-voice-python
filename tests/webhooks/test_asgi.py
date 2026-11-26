@@ -115,7 +115,7 @@ async def test_callback_failure_returns_exact_500_without_internal_details():
         raise RuntimeError("private ASGI callback detail")
 
     body, headers = signed_request()
-    app = create_asgi_app(AsyncWebhookDispatcher(secret=SECRET, on=callback))
+    app = create_asgi_app(AsyncWebhookDispatcher(secret=SECRET, on={"webhook.test": callback}))
 
     result = await request(app, body=body, headers=headers)
 
@@ -207,7 +207,7 @@ def scripted_receive(messages):
 async def test_client_disconnect_mid_body_sends_nothing_and_skips_dispatch():
     handled = []
     app = create_asgi_app(
-        AsyncWebhookDispatcher(secret=SECRET, on=handled.append),
+        AsyncWebhookDispatcher(secret=SECRET, on={"webhook.test": handled.append}),
     )
     body, headers = signed_request()
     sent = []

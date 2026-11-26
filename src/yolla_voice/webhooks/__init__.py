@@ -1,7 +1,14 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from .asgi import create_asgi_app
-from .dispatch import AsyncWebhookDispatcher, WebhookDispatcher, WebhookResponse
+from .dispatch import (
+    AsyncWebhookDispatcher,
+    ErrorCallback,
+    EventHandlers,
+    UnhandledCallback,
+    WebhookDispatcher,
+    WebhookResponse,
+)
 from .events import KnownWebhookEvent, UnknownWebhookEvent, WebhookEvent, parse_event
 from .secret import WebhookSecret
 from .sign import SignedWebhook, WebhookPayload, sign_webhook
@@ -39,9 +46,9 @@ class Webhooks:
         *,
         secret: WebhookSecret | None = None,
         tolerance: float = DEFAULT_TOLERANCE,
-        on: Callable[[KnownWebhookEvent], object] | None = None,
-        on_unhandled: Callable[[UnknownWebhookEvent], object] | None = None,
-        on_error: Callable[[Exception], object] | None = None,
+        on: EventHandlers | None = None,
+        on_unhandled: UnhandledCallback | None = None,
+        on_error: ErrorCallback | None = None,
     ) -> WebhookDispatcher:
         resolved_secret = self._secret if secret is None else secret
         return WebhookDispatcher(
@@ -57,9 +64,9 @@ class Webhooks:
         *,
         secret: WebhookSecret | None = None,
         tolerance: float = DEFAULT_TOLERANCE,
-        on: Callable[[KnownWebhookEvent], object] | None = None,
-        on_unhandled: Callable[[UnknownWebhookEvent], object] | None = None,
-        on_error: Callable[[Exception], object] | None = None,
+        on: EventHandlers | None = None,
+        on_unhandled: UnhandledCallback | None = None,
+        on_error: ErrorCallback | None = None,
     ) -> AsyncWebhookDispatcher:
         resolved_secret = self._secret if secret is None else secret
         return AsyncWebhookDispatcher(
@@ -89,8 +96,11 @@ class Webhooks:
 
 __all__ = [
     "AsyncWebhookDispatcher",
+    "ErrorCallback",
+    "EventHandlers",
     "KnownWebhookEvent",
     "SignedWebhook",
+    "UnhandledCallback",
     "UnknownWebhookEvent",
     "WebhookDispatcher",
     "WebhookEvent",

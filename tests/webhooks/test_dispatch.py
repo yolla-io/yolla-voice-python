@@ -4,6 +4,7 @@ import pytest
 
 import yolla_voice
 from yolla_voice import YollaVoice
+from yolla_voice.errors import WebhookVerificationError
 from yolla_voice.webhooks import (
     AsyncWebhookDispatcher,
     UnknownWebhookEvent,
@@ -40,7 +41,7 @@ def assert_response(response, status, body):
 
 def test_known_event_dispatches_to_on_and_returns_received_response():
     seen = []
-    dispatcher = WebhookDispatcher(secret=SECRET, on=seen.append)
+    dispatcher = WebhookDispatcher(secret=SECRET, on={"webhook.test": seen.append})
 
     response = dispatcher.handle(*signed_request())
 
@@ -54,7 +55,7 @@ def test_unknown_event_dispatches_only_to_on_unhandled():
     unknown = []
     dispatcher = WebhookDispatcher(
         secret=SECRET,
-        on=known.append,
+        on={"webhook.test": known.append},
         on_unhandled=unknown.append,
     )
 
@@ -76,12 +77,12 @@ def test_event_without_a_callback_is_intentionally_unhandled(body):
     assert_response(response, 200, RECEIVED)
 
 
-def test_verification_failure_returns_401_without_calling_callbacks():
+def test_verification_failure_returns_401_and_reports_reason_to_on_error():
     seen = []
     errors = []
     dispatcher = WebhookDispatcher(
         secret=SECRET,
-        on=seen.append,
+        on={"webhook.test": seen.append},
         on_unhandled=seen.append,
         on_error=errors.append,
     )
@@ -90,7 +91,9 @@ def test_verification_failure_returns_401_without_calling_callbacks():
     response = dispatcher.handle(body, {**headers, "X-Voice-Signature": f"v1={'0' * 64}"})
 
     assert seen == []
-    assert errors == []
+    assert len(errors) == 1
+    assert isinstance(errors[0], WebhookVerificationError)
+    assert errors[0].reason == "bad_signature"
     assert_response(response, 401, VERIFICATION_FAILED)
     assert SECRET.encode() not in response.body
 
@@ -102,7 +105,9 @@ def test_callback_exception_is_delivered_to_on_error_without_leaking_details():
     def callback(event):
         raise failure
 
-    dispatcher = WebhookDispatcher(secret=SECRET, on=callback, on_error=errors.append)
+    dispatcher = WebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=errors.append
+    )
 
     response = dispatcher.handle(*signed_request())
 
@@ -118,7 +123,9 @@ def test_on_error_exception_does_not_change_callback_failure_response():
     def broken_on_error(error):
         raise RuntimeError("error handler private detail")
 
-    dispatcher = WebhookDispatcher(secret=SECRET, on=callback, on_error=broken_on_error)
+    dispatcher = WebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=broken_on_error
+    )
 
     response = dispatcher.handle(*signed_request())
 
@@ -132,8 +139,9 @@ def test_sync_dispatcher_rejects_coroutine_callbacks_at_creation(name):
     async def callback(value):
         return None
 
+    value = {"webhook.test": callback} if name == "on" else callback
     with pytest.raises(TypeError, match="coroutine"):
-        WebhookDispatcher(secret=SECRET, **{name: callback})
+        WebhookDispatcher(secret=SECRET, **{name: value})
 
 
 def test_sync_callback_returning_awaitable_closes_it_and_reports_type_error():
@@ -148,7 +156,9 @@ def test_sync_callback_returning_awaitable_closes_it_and_reports_type_error():
         awaitables.append(awaitable)
         return awaitable
 
-    dispatcher = WebhookDispatcher(secret=SECRET, on=callback, on_error=errors.append)
+    dispatcher = WebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=errors.append
+    )
 
     response = dispatcher.handle(*signed_request())
 
@@ -173,7 +183,7 @@ def test_on_error_returning_awaitable_is_closed_without_changing_response():
         awaitables.append(awaitable)
         return awaitable
 
-    dispatcher = WebhookDispatcher(secret=SECRET, on=callback, on_error=on_error)
+    dispatcher = WebhookDispatcher(secret=SECRET, on={"webhook.test": callback}, on_error=on_error)
 
     response = dispatcher.handle(*signed_request())
 
@@ -188,7 +198,9 @@ def test_client_factory_binds_secret_and_per_factory_override():
         base_url="https://api.example.com",
         webhook_secret="wrong-secret",
     ) as client:
-        dispatcher = client.webhooks.create_dispatcher(secret=SECRET, on=seen.append)
+        dispatcher = client.webhooks.create_dispatcher(
+            secret=SECRET, on={"webhook.test": seen.append}
+        )
         response = dispatcher.handle(*signed_request())
 
     assert [event.id for event in seen] == ["evt_test"]
@@ -219,3 +231,37 @@ def test_dispatcher_reads_environment_secret_once(monkeypatch):
     )
 
     assert dispatcher.handle(signed.body, signed.headers).status == 200
+
+
+def test_known_event_without_a_handler_goes_to_on_unhandled():
+    handled = []
+    unhandled = []
+    dispatcher = WebhookDispatcher(
+        secret=SECRET,
+        on={"call.completed": handled.append},
+        on_unhandled=unhandled.append,
+    )
+
+    response = dispatcher.handle(*signed_request())
+
+    assert handled == []
+    assert [event.type for event in unhandled] == ["webhook.test"]
+    assert_response(response, 200, RECEIVED)
+
+
+def test_parsed_body_misuse_returns_500_and_reports_type_error():
+    errors = []
+    dispatcher = WebhookDispatcher(secret=SECRET, on_error=errors.append)
+    _, headers = signed_request()
+
+    response = dispatcher.handle({"id": "evt_test"}, headers)  # type: ignore[arg-type]
+
+    assert len(errors) == 1
+    assert isinstance(errors[0], TypeError)
+    assert_response(response, 500, CALLBACK_FAILED)
+
+
+@pytest.mark.parametrize("on", [lambda event: None, {"webhook.test": "not callable"}, {1: print}])
+def test_on_must_map_event_types_to_callables(on):
+    with pytest.raises(TypeError, match="on must"):
+        WebhookDispatcher(secret=SECRET, on=on)

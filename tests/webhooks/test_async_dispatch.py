@@ -40,7 +40,7 @@ async def test_async_known_event_callback_is_awaited():
     async def callback(event):
         seen.append(event)
 
-    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on=callback)
+    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on={"webhook.test": callback})
 
     response = await dispatcher.handle(*signed_request())
 
@@ -57,7 +57,7 @@ async def test_async_unknown_event_callback_is_awaited():
 
     dispatcher = AsyncWebhookDispatcher(
         secret=SECRET,
-        on=known.append,
+        on={"webhook.test": known.append},
         on_unhandled=on_unhandled,
     )
 
@@ -74,7 +74,7 @@ async def test_async_dispatcher_supports_synchronous_event_callbacks():
     unknown = []
     dispatcher = AsyncWebhookDispatcher(
         secret=SECRET,
-        on=known.append,
+        on={"webhook.test": known.append},
         on_unhandled=unknown.append,
     )
 
@@ -95,7 +95,9 @@ async def test_async_dispatch_awaits_custom_awaitable_from_sync_callback():
             seen.append("awaited")
             return iter(())
 
-    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on=lambda event: CallbackAwaitable())
+    dispatcher = AsyncWebhookDispatcher(
+        secret=SECRET, on={"webhook.test": lambda event: CallbackAwaitable()}
+    )
 
     response = await dispatcher.handle(*signed_request())
 
@@ -103,7 +105,7 @@ async def test_async_dispatch_awaits_custom_awaitable_from_sync_callback():
     assert_response(response, 200, RECEIVED)
 
 
-async def test_async_verification_failure_returns_401_without_calling_on_error():
+async def test_async_verification_failure_returns_401_and_reports_to_on_error():
     errors = []
 
     async def on_error(error):
@@ -114,7 +116,7 @@ async def test_async_verification_failure_returns_401_without_calling_on_error()
 
     response = await dispatcher.handle(body, {**headers, "X-Voice-Signature": f"v1={'0' * 64}"})
 
-    assert errors == []
+    assert [error.reason for error in errors] == ["bad_signature"]
     assert_response(response, 401, VERIFICATION_FAILED)
     assert SECRET.encode() not in response.body
 
@@ -129,7 +131,9 @@ async def test_async_callback_exception_is_delivered_to_async_on_error():
     async def on_error(error):
         errors.append(error)
 
-    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on=callback, on_error=on_error)
+    dispatcher = AsyncWebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=on_error
+    )
 
     response = await dispatcher.handle(*signed_request())
 
@@ -145,7 +149,9 @@ async def test_async_dispatcher_supports_synchronous_on_error():
     async def callback(event):
         raise failure
 
-    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on=callback, on_error=errors.append)
+    dispatcher = AsyncWebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=errors.append
+    )
 
     response = await dispatcher.handle(*signed_request())
 
@@ -160,7 +166,9 @@ async def test_async_on_error_exception_does_not_change_response():
     async def broken_on_error(error):
         raise RuntimeError("error handler private detail")
 
-    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on=callback, on_error=broken_on_error)
+    dispatcher = AsyncWebhookDispatcher(
+        secret=SECRET, on={"webhook.test": callback}, on_error=broken_on_error
+    )
 
     response = await dispatcher.handle(*signed_request())
 
@@ -200,7 +208,9 @@ async def test_async_client_factory_binds_secret_and_per_factory_override():
         base_url="https://api.example.com",
         webhook_secret="wrong-secret",
     ) as client:
-        dispatcher = client.webhooks.create_async_dispatcher(secret=SECRET, on=callback)
+        dispatcher = client.webhooks.create_async_dispatcher(
+            secret=SECRET, on={"webhook.test": callback}
+        )
         response = await dispatcher.handle(*signed_request())
 
     assert [event.id for event in seen] == ["evt_test"]

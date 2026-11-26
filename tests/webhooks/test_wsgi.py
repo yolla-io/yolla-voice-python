@@ -119,7 +119,7 @@ def test_callback_failure_returns_exact_500_without_internal_details():
         raise RuntimeError("private WSGI callback detail")
 
     body, headers = signed_request()
-    app = create_wsgi_app(WebhookDispatcher(secret=SECRET, on=callback))
+    app = create_wsgi_app(WebhookDispatcher(secret=SECRET, on={"webhook.test": callback}))
 
     result = request(app, body=body, headers=headers)
 
