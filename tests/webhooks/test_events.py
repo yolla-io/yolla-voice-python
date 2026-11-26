@@ -64,7 +64,7 @@ def test_unknown_event_retains_envelope_original_data_and_extra_fields():
     assert event.data == data
     assert event.id == "evt_1"
     assert event.seq == 4
-    assert event.model_extra["futureField"] == "kept"
+    assert event.model_extra == {"futureField": "kept"}
 
 
 @pytest.mark.parametrize("data", [None, [], "not a mapping", 1])

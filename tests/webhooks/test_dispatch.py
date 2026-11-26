@@ -1,4 +1,6 @@
+import inspect
 import time
+from typing import Any
 
 import pytest
 
@@ -139,7 +141,7 @@ def test_sync_dispatcher_rejects_coroutine_callbacks_at_creation(name):
     async def callback(value):
         return None
 
-    value = {"webhook.test": callback} if name == "on" else callback
+    value: Any = {"webhook.test": callback} if name == "on" else callback
     with pytest.raises(TypeError, match="coroutine"):
         WebhookDispatcher(secret=SECRET, **{name: value})
 
@@ -163,7 +165,7 @@ def test_sync_callback_returning_awaitable_closes_it_and_reports_type_error():
     response = dispatcher.handle(*signed_request())
 
     assert len(awaitables) == 1
-    assert awaitables[0].cr_frame is None
+    assert inspect.getcoroutinestate(awaitables[0]) == inspect.CORO_CLOSED
     assert len(errors) == 1
     assert isinstance(errors[0], TypeError)
     assert_response(response, 500, CALLBACK_FAILED)
@@ -187,7 +189,7 @@ def test_on_error_returning_awaitable_is_closed_without_changing_response():
 
     response = dispatcher.handle(*signed_request())
 
-    assert awaitables[0].cr_frame is None
+    assert inspect.getcoroutinestate(awaitables[0]) == inspect.CORO_CLOSED
     assert_response(response, 500, CALLBACK_FAILED)
 
 

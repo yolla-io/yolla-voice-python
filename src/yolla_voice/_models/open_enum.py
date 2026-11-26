@@ -13,4 +13,4 @@ class OpenEnum(str, Enum):
         return member
 
     def __str__(self) -> str:
-        return self.value
+        return str(self._value_)

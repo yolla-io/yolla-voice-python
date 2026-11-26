@@ -35,9 +35,28 @@ asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
 testpaths = ["tests"]
 
+[tool.coverage.run]
+branch = true
+source = ["yolla_voice"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+# Test bodies are type-checked against the public API; test functions and fixtures
+# themselves do not need annotations.
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = true
+disable_error_code = ["var-annotated"]

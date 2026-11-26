@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from scripts import sync_contract
 

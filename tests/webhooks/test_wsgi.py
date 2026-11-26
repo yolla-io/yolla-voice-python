@@ -218,7 +218,8 @@ def test_keep_alive_request_on_wsgiref_server_gets_a_response():
     thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
     try:
-        with socket.create_connection(server.server_address, timeout=5) as connection:
+        host, port = server.server_address[:2]
+        with socket.create_connection((str(host), port), timeout=5) as connection:
             header_lines = "".join(f"{name}: {value}\r\n" for name, value in headers.items())
             connection.sendall(
                 (

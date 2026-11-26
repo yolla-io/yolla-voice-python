@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 import yolla_voice
@@ -8,7 +10,7 @@ TIMESTAMP = 1700000000
 SECRET = "whsec_test"
 BODY = b'{"id":"evt_test","type":"webhook.test","seq":0,"createdAt":"2026-11-23T10:15:00.000Z","data":{}}'
 SIGNATURE = "v1=7b6fdffeec4f9fb2759d6bcbd22d8c35a73435790b58617d5041b0f1df059a19"
-CLIENT_OPTIONS = {"api_key": "key", "base_url": "https://api.example.com"}
+CLIENT_OPTIONS: dict[str, Any] = {"api_key": "key", "base_url": "https://api.example.com"}
 
 
 def assert_bound_webhooks(client):

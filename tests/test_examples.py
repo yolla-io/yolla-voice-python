@@ -20,7 +20,7 @@ def readme_blocks() -> list[str]:
 
 
 def imported_names(source: str) -> list[tuple[str, str]]:
-    names = []
+    names: list[tuple[str, str]] = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.ImportFrom) and node.module in PUBLIC_MODULES:
             names.extend((node.module, alias.name) for alias in node.names)

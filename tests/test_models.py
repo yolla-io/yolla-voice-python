@@ -37,7 +37,7 @@ def test_unknown_enum_value_survives():
 
 def test_extra_response_field_survives():
     money = Money.model_validate({"amount": "1.25", "currency": "USD", "futureField": 7})
-    assert money.model_extra["futureField"] == 7
+    assert money.model_extra == {"futureField": 7}
 
 
 def test_datetime_fields_are_timezone_aware():

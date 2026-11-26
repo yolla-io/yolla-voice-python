@@ -22,7 +22,7 @@ def test_request_spec_is_frozen():
     request = RequestSpec(method="GET", path="/calls")
 
     with pytest.raises(FrozenInstanceError):
-        request.method = "POST"
+        request.method = "POST"  # type: ignore[misc]
 
 
 def test_http_response_preserves_generic_data_and_metadata():

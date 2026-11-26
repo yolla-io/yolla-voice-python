@@ -5,8 +5,8 @@ from pathlib import Path
 
 if __package__ == "scripts":
     from scripts.generate_models import generate_models
-else:
-    from generate_models import generate_models
+else:  # executed as `python scripts/check_gen.py`
+    from generate_models import generate_models  # type: ignore[import-not-found,no-redef]
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SOURCE = _ROOT / "openapi" / "reseller-api.yaml"
