@@ -204,9 +204,6 @@ class Calls:
             RequestSpec(
                 method="POST",
                 path=f"/v1/calls/{path_param(call_id)}/{action}",
-                # A lost hold/unhold response may hide an applied transition, and a blind
-                # retry would then fail with 409. Error responses (429/5xx) still retry.
-                retry_transport_errors=action == "end",
             ),
             timeout=timeout,
             max_retries=max_retries,
@@ -364,9 +361,6 @@ class AsyncCalls:
             RequestSpec(
                 method="POST",
                 path=f"/v1/calls/{path_param(call_id)}/{action}",
-                # A lost hold/unhold response may hide an applied transition, and a blind
-                # retry would then fail with 409. Error responses (429/5xx) still retry.
-                retry_transport_errors=action == "end",
             ),
             timeout=timeout,
             max_retries=max_retries,

@@ -95,10 +95,6 @@ def _can_retry(spec: RequestSpec, attempt: int, max_retries: int) -> bool:
     return spec.retryable and attempt < max_retries
 
 
-def _can_retry_transport_error(spec: RequestSpec, attempt: int, max_retries: int) -> bool:
-    return spec.retry_transport_errors and _can_retry(spec, attempt, max_retries)
-
-
 def _can_retry_response(spec: RequestSpec, attempt: int, max_retries: int, status: int) -> bool:
     return _can_retry(spec, attempt, max_retries) and (status == 429 or 500 <= status <= 599)
 
@@ -151,7 +147,7 @@ class HttpClient:
                     timeout=request_timeout,
                 )
             except httpx.TransportError as error:
-                if not _can_retry_transport_error(spec, attempt, retries):
+                if not _can_retry(spec, attempt, retries):
                     raise _connection_error(error) from error
                 sleep(_connection_retry_delay(attempt))
                 continue
@@ -206,7 +202,7 @@ class AsyncHttpClient:
                     timeout=request_timeout,
                 )
             except httpx.TransportError as error:
-                if not _can_retry_transport_error(spec, attempt, retries):
+                if not _can_retry(spec, attempt, retries):
                     raise _connection_error(error) from error
                 await async_sleep(_connection_retry_delay(attempt))
                 continue

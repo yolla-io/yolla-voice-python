@@ -296,10 +296,8 @@ async def test_create_serializes_extra_fields_as_json(client_factory):
     assert seen[0]["scheduledAt"] == "2026-11-25T12:00:00Z"
 
 
-@pytest.mark.parametrize(("action", "attempts"), [("hold", 1), ("unhold", 1), ("end", 3)])
-async def test_call_actions_retry_transport_errors_only_when_repeatable(
-    client_factory, monkeypatch, action, attempts
-):
+@pytest.mark.parametrize("action", ["hold", "unhold", "end"])
+async def test_call_actions_retry_transport_errors(client_factory, monkeypatch, action):
     seen = []
 
     async def no_sleep(delay):
@@ -315,7 +313,7 @@ async def test_call_actions_retry_transport_errors_only_when_repeatable(
     with pytest.raises(YollaVoiceError):
         await getattr(client.calls, action)("call-1")
 
-    assert len(seen) == attempts
+    assert len(seen) == 3
 
 
 @pytest.mark.parametrize("action", ["hold", "unhold"])

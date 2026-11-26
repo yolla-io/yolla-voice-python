@@ -435,34 +435,3 @@ def test_request_rejects_invalid_retry_count_before_io(client_factory, max_retri
         client.request(RequestSpec("GET", "/calls"), max_retries=max_retries)
 
     assert calls == []
-
-
-def test_disabled_transport_retries_stop_after_one_attempt(client_factory):
-    calls = []
-
-    def handler(request):
-        calls.append(request)
-        raise httpx.ReadTimeout("lost response")
-
-    client = client_factory(handler)
-    with pytest.raises(APITimeoutError):
-        client.request(RequestSpec("POST", "/calls/1/hold", retry_transport_errors=False))
-
-    assert len(calls) == 1
-
-
-def test_disabled_transport_retries_still_retry_error_responses(client_factory, monkeypatch):
-    calls = []
-    monkeypatch.setattr(client_module, "sleep", lambda delay: None)
-
-    def handler(request):
-        calls.append(request)
-        if len(calls) == 1:
-            return json_response(503, error_body())
-        return json_response(200, {"id": "call-1"})
-
-    client = client_factory(handler)
-    response = client.request(RequestSpec("POST", "/calls/1/hold", retry_transport_errors=False))
-
-    assert response.status == 200
-    assert len(calls) == 2
