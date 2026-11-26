@@ -5,7 +5,7 @@ import httpx
 from yolla_voice import AsyncYollaVoice, Balance, NumberPrice, YollaVoice
 
 API_KEY = "test-api-key"
-BASE_URL = "https://api.example.com"
+BASE_URL = "https://platform.yolla.io/api"
 
 
 def json_response(body):
@@ -43,13 +43,11 @@ def test_balance_and_pricing_get_typed_models_and_encode_number():
 
     def handler(request):
         seen.append(request)
-        if request.url.path == "/v1/balance":
+        if request.url.path == "/api/v1/balance":
             return json_response(balance_payload())
         return json_response(price_payload())
 
-    with YollaVoice(
-        api_key=API_KEY, base_url=BASE_URL, transport=httpx.MockTransport(handler)
-    ) as client:
+    with YollaVoice(api_key=API_KEY, transport=httpx.MockTransport(handler)) as client:
         balance = client.balance.get(timeout=2.0, max_retries=0)
         price = client.pricing.get_number_price("1415/55 0100", timeout=3.0, max_retries=0)
 
@@ -68,13 +66,11 @@ async def test_async_balance_and_pricing_match_sync_behavior():
 
     def handler(request):
         seen.append(request)
-        if request.url.path == "/v1/balance":
+        if request.url.path == "/api/v1/balance":
             return json_response(balance_payload())
         return json_response(price_payload())
 
-    async with AsyncYollaVoice(
-        api_key=API_KEY, base_url=BASE_URL, transport=httpx.MockTransport(handler)
-    ) as client:
+    async with AsyncYollaVoice(api_key=API_KEY, transport=httpx.MockTransport(handler)) as client:
         balance = await client.balance.get(timeout=2.0, max_retries=0)
         price = await client.pricing.get_number_price("1415/55 0100", timeout=3.0, max_retries=0)
 

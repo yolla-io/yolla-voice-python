@@ -197,7 +197,6 @@ def test_client_factory_binds_secret_and_per_factory_override():
     seen = []
     with YollaVoice(
         api_key="key",
-        base_url="https://api.example.com",
         webhook_secret="wrong-secret",
     ) as client:
         dispatcher = client.webhooks.create_dispatcher(

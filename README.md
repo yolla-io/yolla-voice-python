@@ -60,13 +60,13 @@ client = YollaVoice(api_key="your-api-key", timeout=10.0, max_retries=3)
 | Option           | Environment variable   | Default                         | Description                                          |
 | ---------------- | ---------------------- | ------------------------------- | ---------------------------------------------------- |
 | `api_key`        | `YOLLA_API_KEY`        | none                            | Reseller API key. Required.                          |
-| `base_url`       |                        | `https://platform.yolla.io/api` | API root; override only for tests or a proxy.        |
 | `webhook_secret` | `YOLLA_WEBHOOK_SECRET` | none                            | Signing secret, or a list of secrets during rotation. |
 | `timeout`        |                        | `30.0`                          | Timeout of one attempt, in seconds.                  |
 | `max_retries`    |                        | `2`                             | Retries after a 429, 5xx, network error or timeout.  |
 | `transport`      |                        | `httpx` default                 | Custom `httpx` transport, for proxies or tests.      |
 
-The constructor raises `ValueError` when the API key is missing. The API key and webhook secrets
+Requests go to `https://platform.yolla.io/api`. The constructor raises `ValueError` when the API key
+is missing. The API key and webhook secrets
 never appear in exception messages or in the `repr` of the client or of any error.
 
 A client owns a connection pool. Use it as a context manager, or call `close()` (`await aclose()`

@@ -7,7 +7,6 @@ from yolla_voice.webhooks import AsyncWebhookDispatcher, WebhookDispatcher
 
 CLIENT_PARAMETERS = [
     "api_key",
-    "base_url",
     "webhook_secret",
     "timeout",
     "max_retries",

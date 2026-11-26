@@ -1,3 +1,4 @@
+import inspect
 import json
 
 import httpx
@@ -43,7 +44,6 @@ def test_environment_fallback_and_explicit_precedence_are_observable(monkeypatch
     environment_client.balance.get()
     explicit_client = YollaVoice(
         api_key="explicit-api-secret",
-        base_url="https://explicit.example.com/",
         webhook_secret=("explicit-webhook-one", "explicit-webhook-two"),
         transport=httpx.MockTransport(handler),
     )
@@ -51,7 +51,7 @@ def test_environment_fallback_and_explicit_precedence_are_observable(monkeypatch
 
     assert str(seen[0].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[0].headers["Authorization"] == "Bearer environment-api-secret"
-    assert str(seen[1].url) == "https://explicit.example.com/v1/balance"
+    assert str(seen[1].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[1].headers["Authorization"] == "Bearer explicit-api-secret"
     for client in (environment_client, explicit_client):
         rendered = repr(client) + str(client)
@@ -81,7 +81,6 @@ async def test_async_environment_fallback_and_explicit_precedence(monkeypatch):
     await environment_client.balance.get()
     explicit_client = AsyncYollaVoice(
         api_key="explicit-api-secret",
-        base_url="https://explicit.example.com/",
         webhook_secret=("explicit-webhook-one", "explicit-webhook-two"),
         transport=httpx.MockTransport(handler),
     )
@@ -89,7 +88,7 @@ async def test_async_environment_fallback_and_explicit_precedence(monkeypatch):
 
     assert str(seen[0].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[0].headers["Authorization"] == "Bearer environment-api-secret"
-    assert str(seen[1].url) == "https://explicit.example.com/v1/balance"
+    assert str(seen[1].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[1].headers["Authorization"] == "Bearer explicit-api-secret"
     for client in (environment_client, explicit_client):
         rendered = repr(client) + str(client)
@@ -107,24 +106,19 @@ def test_missing_api_key_names_option_and_environment(client_type, monkeypatch):
     monkeypatch.delenv("YOLLA_API_KEY", raising=False)
 
     with pytest.raises(ValueError) as caught:
-        client_type(base_url="https://api.example.com")
+        client_type()
 
     assert "api_key" in str(caught.value)
     assert "YOLLA_API_KEY" in str(caught.value)
 
 
 @pytest.mark.parametrize("client_type", [YollaVoice, AsyncYollaVoice])
-@pytest.mark.parametrize("base_url", [None, ""])
-def test_base_url_defaults_to_the_production_api(client_type, monkeypatch, base_url):
+def test_base_url_is_not_configurable(client_type):
+    assert "base_url" not in inspect.signature(client_type).parameters
+
+
+def test_requests_go_to_the_production_api(monkeypatch):
     monkeypatch.setenv("YOLLA_BASE_URL", "https://ignored.example.com")
-
-    client = client_type(api_key="must-not-leak", base_url=base_url)
-
-    assert client._base_url == "https://platform.yolla.io/api"
-    assert "must-not-leak" not in repr(client)
-
-
-def test_default_base_url_reaches_the_transport():
     seen = []
 
     def handler(request):
@@ -145,9 +139,7 @@ def test_sync_defaults_are_30_seconds_and_two_retries(monkeypatch):
         return error_response()
 
     monkeypatch.setattr(http_module, "sleep", lambda delay: None)
-    client = YollaVoice(
-        api_key="key", base_url="https://api.example.com", transport=httpx.MockTransport(handler)
-    )
+    client = YollaVoice(api_key="key", transport=httpx.MockTransport(handler))
     with pytest.raises(ServerError):
         client.balance.get()
 
@@ -167,9 +159,7 @@ async def test_async_defaults_are_30_seconds_and_two_retries(monkeypatch):
         return None
 
     monkeypatch.setattr(http_module, "async_sleep", no_sleep)
-    client = AsyncYollaVoice(
-        api_key="key", base_url="https://api.example.com", transport=httpx.MockTransport(handler)
-    )
+    client = AsyncYollaVoice(api_key="key", transport=httpx.MockTransport(handler))
     with pytest.raises(ServerError):
         await client.balance.get()
 
@@ -188,7 +178,6 @@ def test_sync_per_call_overrides_replace_defaults(monkeypatch):
     monkeypatch.setattr(http_module, "sleep", lambda delay: None)
     client = YollaVoice(
         api_key="key",
-        base_url="https://api.example.com",
         timeout=20,
         max_retries=5,
         transport=httpx.MockTransport(handler),
@@ -214,7 +203,6 @@ async def test_async_per_call_overrides_replace_defaults(monkeypatch):
     monkeypatch.setattr(http_module, "async_sleep", no_sleep)
     client = AsyncYollaVoice(
         api_key="key",
-        base_url="https://api.example.com",
         timeout=20,
         max_retries=5,
         transport=httpx.MockTransport(handler),
@@ -236,7 +224,6 @@ def test_sync_context_manager_close_and_closed_zero_io():
 
     client = YollaVoice(
         api_key="closed-secret",
-        base_url="https://api.example.com",
         webhook_secret="closed-webhook-secret",
         transport=httpx.MockTransport(handler),
     )
@@ -261,7 +248,6 @@ async def test_async_context_manager_close_and_closed_zero_io():
 
     client = AsyncYollaVoice(
         api_key="closed-secret",
-        base_url="https://api.example.com",
         webhook_secret="closed-webhook-secret",
         transport=httpx.MockTransport(handler),
     )

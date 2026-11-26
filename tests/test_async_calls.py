@@ -12,7 +12,7 @@ from yolla_voice import AsyncYollaVoice, Call, CallStatus, CreateCallRequest, Cr
 from yolla_voice.errors import YollaVoiceError
 
 API_KEY = "test-api-key"
-BASE_URL = "https://api.example.com"
+BASE_URL = "https://platform.yolla.io/api"
 
 
 def call_payload(call_id="call-1"):
@@ -55,7 +55,6 @@ async def client_factory():
     def factory(handler, **options):
         client = AsyncYollaVoice(
             api_key=API_KEY,
-            base_url=BASE_URL,
             transport=httpx.MockTransport(handler),
             **options,
         )
