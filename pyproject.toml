@@ -26,6 +26,20 @@ dev = [
     "ruff>=0.8",
 ]
 
+[tool.hatch.build.targets.sdist]
+# Explicit allowlist: local tool state and agent files never ship.
+only-include = [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "examples",
+    "openapi",
+    "scripts",
+    "src",
+    "tests",
+    "uv.lock",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/yolla_voice"]
 
