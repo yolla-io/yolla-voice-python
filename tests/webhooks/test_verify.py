@@ -234,3 +234,11 @@ def test_exact_verification_error_output_redacts_actual_secret_and_signatures():
     assert SIGNATURE[3:] not in rendered
     assert received not in rendered
     assert received[3:] not in rendered
+
+
+@pytest.mark.parametrize("now", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_now_is_rejected_instead_of_skipping_staleness(now):
+    signed = sign_webhook(b"{}", secret=SECRET, timestamp=1)
+
+    with pytest.raises(ValueError, match="now must be a finite number"):
+        verify_webhook(signed.body, signed.headers, secret=SECRET, now=now)

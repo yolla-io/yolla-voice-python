@@ -30,12 +30,32 @@ async def _send_response(
     await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
+async def _run_lifespan(receive: _Receive, send: _Send) -> None:
+    while True:
+        message = await receive()
+        if message.get("type") == "lifespan.startup":
+            await send({"type": "lifespan.startup.complete"})
+        elif message.get("type") == "lifespan.shutdown":
+            await send({"type": "lifespan.shutdown.complete"})
+            return
+
+
 def create_asgi_app(
     dispatcher: AsyncWebhookDispatcher,
     *,
     max_body_bytes: int = 1_048_576,
 ) -> _ASGIApplication:
     async def app(scope: _Scope, receive: _Receive, send: _Send) -> None:
+        scope_type = scope.get("type")
+        if scope_type == "lifespan":
+            await _run_lifespan(receive, send)
+            return
+        if scope_type == "websocket":
+            await send({"type": "websocket.close", "code": 1008})
+            return
+        if scope_type != "http":
+            raise ValueError(f"Unsupported ASGI scope type: {scope_type!r}")
+
         if scope.get("method") != "POST":
             await _send_response(send, 405, _METHOD_NOT_ALLOWED, allow_post=True)
             return
@@ -58,6 +78,8 @@ def create_asgi_app(
         body = bytearray()
         while True:
             message = await receive()
+            if message.get("type") == "http.disconnect":
+                return
             remaining = max_body_bytes + 1 - len(body)
             chunk = message.get("body", b"")
             body.extend(chunk[:remaining])

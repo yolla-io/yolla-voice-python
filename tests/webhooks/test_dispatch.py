@@ -5,6 +5,7 @@ import pytest
 import yolla_voice
 from yolla_voice import YollaVoice
 from yolla_voice.webhooks import (
+    AsyncWebhookDispatcher,
     UnknownWebhookEvent,
     WebhookDispatcher,
     WebhookResponse,
@@ -199,3 +200,23 @@ def test_root_exports_dispatchers_and_response():
     assert yolla_voice.WebhookDispatcher is WebhookDispatcher
     assert yolla_voice.WebhookResponse is WebhookResponse
     assert yolla_voice.AsyncWebhookDispatcher is not None
+
+
+@pytest.mark.parametrize("factory", [WebhookDispatcher, AsyncWebhookDispatcher])
+def test_dispatcher_resolves_secret_at_construction(monkeypatch, factory):
+    monkeypatch.delenv("YOLLA_WEBHOOK_SECRET", raising=False)
+
+    with pytest.raises(ValueError, match="Missing webhook secret"):
+        factory()
+
+
+def test_dispatcher_reads_environment_secret_once(monkeypatch):
+    monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", SECRET)
+    dispatcher = WebhookDispatcher()
+    monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", "rotated-elsewhere")
+    signed = sign_webhook(
+        b'{"id":"evt_1","type":"webhook.test","seq":0,"createdAt":"2026-11-23T10:15:00Z","data":{}}',
+        secret=SECRET,
+    )
+
+    assert dispatcher.handle(signed.body, signed.headers).status == 200

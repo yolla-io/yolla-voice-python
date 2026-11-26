@@ -192,3 +192,66 @@ async def test_custom_limit_stops_at_limit_plus_one_across_chunk_boundaries():
 
 def test_asgi_factory_is_exported_from_both_public_modules():
     assert yolla_voice.create_asgi_app is create_asgi_app
+
+
+def scripted_receive(messages):
+    queue = list(messages)
+
+    async def receive():
+        if not queue:
+            raise AssertionError("ASGI application read past the scripted messages")
+        return queue.pop(0)
+
+    return receive
+
+
+async def test_client_disconnect_mid_body_sends_nothing_and_skips_dispatch():
+    handled = []
+    app = create_asgi_app(
+        AsyncWebhookDispatcher(secret=SECRET, on=handled.append),
+    )
+    body, headers = signed_request()
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    receive = scripted_receive(
+        [
+            {"type": "http.request", "body": body[:10], "more_body": True},
+            {"type": "http.disconnect"},
+        ]
+    )
+    raw_headers = [(name.lower().encode(), value.encode()) for name, value in headers.items()]
+    await app({"type": "http", "method": "POST", "headers": raw_headers}, receive, send)
+
+    assert sent == []
+    assert handled == []
+
+
+async def test_lifespan_scope_completes_startup_and_shutdown():
+    app = create_asgi_app(AsyncWebhookDispatcher(secret=SECRET))
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    receive = scripted_receive([{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}])
+    await app({"type": "lifespan"}, receive, send)
+
+    assert sent == [
+        {"type": "lifespan.startup.complete"},
+        {"type": "lifespan.shutdown.complete"},
+    ]
+
+
+async def test_websocket_scope_is_closed_with_policy_violation():
+    app = create_asgi_app(AsyncWebhookDispatcher(secret=SECRET))
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    await app({"type": "websocket", "headers": []}, scripted_receive([]), send)
+
+    assert sent == [{"type": "websocket.close", "code": 1008}]

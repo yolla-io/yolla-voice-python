@@ -1,5 +1,8 @@
 import io
+import socket
+import threading
 import time
+from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import yolla_voice
 from yolla_voice.webhooks import WebhookDispatcher, create_wsgi_app, sign_webhook
@@ -12,6 +15,7 @@ VERIFICATION_FAILED = b'{"error":"webhook_verification_failed"}'
 CALLBACK_FAILED = b'{"error":"webhook_callback_failed"}'
 METHOD_NOT_ALLOWED = b'{"error":"method_not_allowed"}'
 PAYLOAD_TOO_LARGE = b'{"error":"payload_too_large"}'
+LENGTH_REQUIRED = b'{"error":"length_required"}'
 _DEFAULT_CONTENT_LENGTH = object()
 
 
@@ -55,9 +59,12 @@ def request(
     headers=None,
     stream=None,
     content_length=_DEFAULT_CONTENT_LENGTH,
+    terminated=False,
 ):
     input_stream = stream if stream is not None else io.BytesIO(body)
     environ = {"REQUEST_METHOD": method, "wsgi.input": input_stream}
+    if terminated:
+        environ["wsgi.input_terminated"] = True
     if content_length is _DEFAULT_CONTENT_LENGTH:
         content_length = str(len(body))
     if content_length is not None:
@@ -152,7 +159,7 @@ def test_exactly_one_mib_stream_is_accepted():
     body, headers = signed_request(sized_body(MAX_BODY_BYTES))
     app = create_wsgi_app(WebhookDispatcher(secret=SECRET))
 
-    result = request(app, body=body, headers=headers, content_length=None)
+    result = request(app, body=body, headers=headers, content_length=None, terminated=True)
 
     assert_response(result, "200 OK", RECEIVED)
 
@@ -161,7 +168,7 @@ def test_one_byte_over_one_mib_stream_is_rejected():
     body, headers = signed_request(sized_body(MAX_BODY_BYTES + 1))
     app = create_wsgi_app(WebhookDispatcher(secret=SECRET))
 
-    result = request(app, body=body, headers=headers, content_length=None)
+    result = request(app, body=body, headers=headers, content_length=None, terminated=True)
 
     assert_response(result, "413 Payload Too Large", PAYLOAD_TOO_LARGE)
 
@@ -170,11 +177,64 @@ def test_partial_reads_are_bounded_and_stop_at_limit_plus_one():
     app = create_wsgi_app(WebhookDispatcher(secret=SECRET), max_body_bytes=8)
     stream = BoundedInput(b"123456789 unread", chunk_size=3)
 
-    result = request(app, stream=stream, content_length=None)
+    result = request(app, stream=stream, content_length=None, terminated=True)
 
     assert_response(result, "413 Payload Too Large", PAYLOAD_TOO_LARGE)
     assert stream.bytes_read == 9
     assert stream.requested_sizes == [9, 6, 3]
+
+
+def test_missing_content_length_without_terminated_input_returns_411_without_reading():
+    body, headers = signed_request()
+    app = create_wsgi_app(WebhookDispatcher(secret=SECRET))
+    stream = BoundedInput(body, chunk_size=10)
+
+    result = request(app, body=body, headers=headers, stream=stream, content_length=None)
+
+    assert_response(result, "411 Length Required", LENGTH_REQUIRED)
+    assert stream.requested_sizes == []
+
+
+def test_reads_exactly_content_length_and_never_past_it():
+    body, headers = signed_request()
+    app = create_wsgi_app(WebhookDispatcher(secret=SECRET))
+    stream = BoundedInput(body + b"next pipelined request", chunk_size=7)
+
+    result = request(app, body=body, headers=headers, stream=stream)
+
+    assert_response(result, "200 OK", RECEIVED)
+    assert stream.bytes_read == len(body)
+    assert max(stream.requested_sizes) <= len(body)
+
+
+def test_keep_alive_request_on_wsgiref_server_gets_a_response():
+    body, headers = signed_request()
+
+    class QuietHandler(WSGIRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+    app = create_wsgi_app(WebhookDispatcher(secret=SECRET))
+    server = make_server("127.0.0.1", 0, app, handler_class=QuietHandler)
+    thread = threading.Thread(target=server.handle_request, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(server.server_address, timeout=5) as connection:
+            header_lines = "".join(f"{name}: {value}\r\n" for name, value in headers.items())
+            connection.sendall(
+                (
+                    "POST / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n"
+                    f"Content-Type: application/json\r\nContent-Length: {len(body)}\r\n"
+                    f"{header_lines}\r\n"
+                ).encode("ascii")
+                + body
+            )
+            status_line = connection.recv(64).split(b"\r\n", 1)[0]
+    finally:
+        thread.join(timeout=5)
+        server.server_close()
+
+    assert status_line.endswith(b"200 OK")
 
 
 def test_wsgi_factory_is_exported_from_both_public_modules():

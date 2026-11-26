@@ -5,7 +5,7 @@ from typing import Literal
 
 from ..errors import WebhookVerificationError
 from .events import KnownWebhookEvent, UnknownWebhookEvent
-from .secret import WebhookSecret
+from .secret import WebhookSecret, resolve_webhook_secret
 from .verify import DEFAULT_TOLERANCE, verify_webhook
 
 _EventCallback = Callable[[KnownWebhookEvent], object]
@@ -63,7 +63,7 @@ class WebhookDispatcher:
         on_error: _ErrorCallback | None = None,
     ) -> None:
         _reject_coroutine_callbacks(on=on, on_unhandled=on_unhandled, on_error=on_error)
-        self._secret = secret
+        self._secret = resolve_webhook_secret(secret)
         self._tolerance = tolerance
         self._on = on
         self._on_unhandled = on_unhandled
@@ -118,7 +118,7 @@ class AsyncWebhookDispatcher:
         on_unhandled: _UnhandledCallback | None = None,
         on_error: _ErrorCallback | None = None,
     ) -> None:
-        self._secret = secret
+        self._secret = resolve_webhook_secret(secret)
         self._tolerance = tolerance
         self._on = on
         self._on_unhandled = on_unhandled

@@ -4,10 +4,12 @@ from .dispatch import WebhookDispatcher
 
 _METHOD_NOT_ALLOWED = b'{"error":"method_not_allowed"}'
 _PAYLOAD_TOO_LARGE = b'{"error":"payload_too_large"}'
+_LENGTH_REQUIRED = b'{"error":"length_required"}'
 _REASONS = {
     200: "OK",
     401: "Unauthorized",
     405: "Method Not Allowed",
+    411: "Length Required",
     413: "Payload Too Large",
     500: "Internal Server Error",
 }
@@ -28,6 +30,12 @@ def _response(
     return f"{status} {_REASONS[status]}", headers, [body]
 
 
+def _content_length(value: object) -> int | None:
+    if not isinstance(value, str) or not value.strip().isdigit():
+        return None
+    return int(value)
+
+
 def create_wsgi_app(
     dispatcher: WebhookDispatcher,
     *,
@@ -39,19 +47,24 @@ def create_wsgi_app(
             start_response(status, headers)
             return body
 
-        content_length = environ.get("CONTENT_LENGTH")
-        try:
-            if content_length is not None and int(content_length) > max_body_bytes:
-                status, headers, body = _response(413, _PAYLOAD_TOO_LARGE)
-                start_response(status, headers)
-                return body
-        except ValueError:
-            pass
+        content_length = _content_length(environ.get("CONTENT_LENGTH"))
+        terminated = bool(environ.get("wsgi.input_terminated"))
+        if content_length is None and not terminated:
+            # PEP 3333 forbids reading past CONTENT_LENGTH; without it, a read can
+            # block on a keep-alive socket until the client gives up.
+            status, headers, body = _response(411, _LENGTH_REQUIRED)
+            start_response(status, headers)
+            return body
+        if content_length is not None and content_length > max_body_bytes:
+            status, headers, body = _response(413, _PAYLOAD_TOO_LARGE)
+            start_response(status, headers)
+            return body
 
         input_stream = environ["wsgi.input"]
+        limit = max_body_bytes + 1 if content_length is None else content_length
         raw_body = bytearray()
-        while len(raw_body) <= max_body_bytes:
-            chunk = input_stream.read(max_body_bytes + 1 - len(raw_body))
+        while len(raw_body) < limit:
+            chunk = input_stream.read(limit - len(raw_body))
             if not chunk:
                 break
             raw_body.extend(chunk)

@@ -45,6 +45,8 @@ def verify_webhook(
     body = _raw_body_bytes(raw_body)
     if tolerance < 0 or not math.isfinite(tolerance):
         raise ValueError("tolerance must be a non-negative finite number")
+    if now is not None and not math.isfinite(now):
+        raise ValueError("now must be a finite number")
 
     timestamp = (get_header(headers, TIMESTAMP_HEADER) or "").strip()
     signature = (get_header(headers, SIGNATURE_HEADER) or "").strip()
