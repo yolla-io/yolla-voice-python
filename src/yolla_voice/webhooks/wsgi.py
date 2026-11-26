@@ -2,9 +2,9 @@ from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from .dispatch import WebhookDispatcher
 
-_METHOD_NOT_ALLOWED = b'{"error":"method_not_allowed"}'
-_PAYLOAD_TOO_LARGE = b'{"error":"payload_too_large"}'
-_LENGTH_REQUIRED = b'{"error":"length_required"}'
+_METHOD_NOT_ALLOWED = b'{"error":"method not allowed"}'
+_PAYLOAD_TOO_LARGE = b'{"error":"payload too large"}'
+_LENGTH_REQUIRED = b'{"error":"length required"}'
 _REASONS = {
     200: "OK",
     401: "Unauthorized",

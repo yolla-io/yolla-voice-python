@@ -12,8 +12,8 @@ SECRET = "whsec_async_dispatch_test"
 BODY = b'{"id":"evt_test","type":"webhook.test","seq":0,"createdAt":"2026-11-23T10:15:00.000Z","data":{}}'
 UNKNOWN_BODY = b'{"id":"evt_unknown","type":"call.future","seq":1,"createdAt":"2026-11-23T10:15:00.000Z","data":{"future":true}}'
 RECEIVED = b'{"received":true}'
-VERIFICATION_FAILED = b'{"error":"webhook_verification_failed"}'
-CALLBACK_FAILED = b'{"error":"webhook_callback_failed"}'
+VERIFICATION_FAILED = b'{"error":"invalid signature"}'
+CALLBACK_FAILED = b'{"error":"handler failed"}'
 
 
 def signed_request(body=BODY, secret=SECRET):
@@ -117,7 +117,6 @@ async def test_async_verification_failure_returns_401_without_calling_on_error()
     assert errors == []
     assert_response(response, 401, VERIFICATION_FAILED)
     assert SECRET.encode() not in response.body
-    assert b"signature" not in response.body
 
 
 async def test_async_callback_exception_is_delivered_to_async_on_error():

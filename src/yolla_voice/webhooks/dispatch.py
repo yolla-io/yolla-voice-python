@@ -25,9 +25,9 @@ def _response(status: _Status) -> WebhookResponse:
     if status == 200:
         body = b'{"received":true}'
     elif status == 401:
-        body = b'{"error":"webhook_verification_failed"}'
+        body = b'{"error":"invalid signature"}'
     else:
-        body = b'{"error":"webhook_callback_failed"}'
+        body = b'{"error":"handler failed"}'
     return WebhookResponse(
         status=status,
         headers={"Content-Type": "application/json"},

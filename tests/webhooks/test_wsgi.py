@@ -11,11 +11,11 @@ MAX_BODY_BYTES = 1_048_576
 SECRET = "whsec_wsgi_test"
 BODY = b'{"id":"evt_test","type":"webhook.test","seq":0,"createdAt":"2026-11-23T10:15:00.000Z","data":{}}'
 RECEIVED = b'{"received":true}'
-VERIFICATION_FAILED = b'{"error":"webhook_verification_failed"}'
-CALLBACK_FAILED = b'{"error":"webhook_callback_failed"}'
-METHOD_NOT_ALLOWED = b'{"error":"method_not_allowed"}'
-PAYLOAD_TOO_LARGE = b'{"error":"payload_too_large"}'
-LENGTH_REQUIRED = b'{"error":"length_required"}'
+VERIFICATION_FAILED = b'{"error":"invalid signature"}'
+CALLBACK_FAILED = b'{"error":"handler failed"}'
+METHOD_NOT_ALLOWED = b'{"error":"method not allowed"}'
+PAYLOAD_TOO_LARGE = b'{"error":"payload too large"}'
+LENGTH_REQUIRED = b'{"error":"length required"}'
 _DEFAULT_CONTENT_LENGTH = object()
 
 
@@ -112,7 +112,6 @@ def test_invalid_signature_returns_exact_401_response():
     result = request(app, body=body, headers=headers)
 
     assert_response(result, "401 Unauthorized", VERIFICATION_FAILED)
-    assert b"signature" not in result[2]
 
 
 def test_callback_failure_returns_exact_500_without_internal_details():

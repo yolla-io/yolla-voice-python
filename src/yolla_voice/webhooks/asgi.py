@@ -9,8 +9,8 @@ _Receive: TypeAlias = Callable[[], Awaitable[_Message]]
 _Send: TypeAlias = Callable[[_Message], Awaitable[None]]
 _ASGIApplication: TypeAlias = Callable[[_Scope, _Receive, _Send], Awaitable[None]]
 
-_METHOD_NOT_ALLOWED = b'{"error":"method_not_allowed"}'
-_PAYLOAD_TOO_LARGE = b'{"error":"payload_too_large"}'
+_METHOD_NOT_ALLOWED = b'{"error":"method not allowed"}'
+_PAYLOAD_TOO_LARGE = b'{"error":"payload too large"}'
 
 
 async def _send_response(
