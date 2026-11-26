@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import AnyUrl, AwareDatetime, ConfigDict, Field, RootModel
+from pydantic import AnyUrl, AwareDatetime, ConfigDict, Field
 from typing_extensions import TypeAliasType
 
 from yolla_voice._models.base import BaseModel
@@ -61,14 +61,6 @@ class CallStatus(OpenEnum):
 CustomParamsAdditionalProperty = TypeAliasType(
     "CustomParamsAdditionalProperty", Annotated[str, Field(max_length=256)]
 )
-
-
-class Destination(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
-
-
-class E164(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[1-9][0-9]{6,14}$")]
 
 
 class EndReason(OpenEnum):
@@ -277,7 +269,7 @@ class Call(BaseModel):
     error_code: Annotated[str | None, Field(alias="errorCode")] = None
     expires_at: Annotated[AwareDatetime, Field(alias="expiresAt")]
     external_user_id: Annotated[str, Field(alias="externalUserId")]
-    from_: Annotated[E164, Field(alias="from")]
+    from_: Annotated[str, Field(alias="from", pattern="^[1-9][0-9]{6,14}$")]
     id: str
     initiated_at: Annotated[AwareDatetime | None, Field(alias="initiatedAt")] = None
     max_duration: Annotated[int | None, Field(alias="maxDuration")] = None
@@ -287,7 +279,7 @@ class Call(BaseModel):
     rate: Rate | None = None
     sip_code: Annotated[int | None, Field(alias="sipCode")] = None
     status: CallStatus
-    to: Destination
+    to: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
 
 
 class Data(BaseModel):
@@ -314,26 +306,26 @@ class CreateCallRequest(BaseModel):
             pattern="^[^\\x00-\\x1F\\x7F-\\x9F]+$",
         ),
     ]
-    from_: Annotated[E164 | None, Field(alias="from")] = None
+    from_: Annotated[str | None, Field(alias="from", pattern="^[1-9][0-9]{6,14}$")] = None
     max_duration: Annotated[int | None, Field(alias="maxDuration", ge=1, le=14400)] = 14400
-    to: Destination
+    to: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
 
 
 class CreateCallResponse(BaseModel):
     call_token: Annotated[str, Field(alias="callToken")]
     created_at: Annotated[AwareDatetime, Field(alias="createdAt")]
     expires_at: Annotated[AwareDatetime, Field(alias="expiresAt")]
-    from_: Annotated[E164, Field(alias="from")]
+    from_: Annotated[str, Field(alias="from", pattern="^[1-9][0-9]{6,14}$")]
     id: str
     max_duration: Annotated[int, Field(alias="maxDuration")]
     rate: Rate | None = None
     status: Literal["created"]
-    to: Destination
+    to: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
 
 
 class NumberPrice(BaseModel):
     country: Annotated[str | None, Field(pattern="^[A-Z]{2}$")] = None
-    number: Destination
+    number: Annotated[str, Field(pattern="^[1-9][0-9]{3,14}$")]
     rate: Rate
 
 

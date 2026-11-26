@@ -99,3 +99,11 @@ def test_call_list_aliases_list_calls_response():
 def test_models_reexports_public_schemas(name):
     assert name in models.__all__
     assert getattr(models, name) is not None
+
+
+def test_phone_number_fields_are_plain_strings():
+    request = CreateCallRequest(to="14155550100", from_="14155550199", external_user_id="user-1")
+
+    assert type(request.to) is str
+    assert type(request.from_) is str
+    assert request.model_dump(by_alias=True, exclude_unset=True)["to"] == "14155550100"

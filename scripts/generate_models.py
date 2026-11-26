@@ -42,6 +42,7 @@ def generate_models(source: Path = _SOURCE, output: Path = _OUTPUT) -> None:
             "none",
             "--snake-case-field",
             "--use-annotated",
+            "--collapse-root-models",
             "--use-standard-collections",
             "--use-subclass-enum",
             "--disable-timestamp",
