@@ -5,7 +5,7 @@ import pytest
 
 import yolla_voice
 import yolla_voice._http.client as http_module
-from yolla_voice import AsyncYollaVoice, YollaVoice, errors, models, pagination
+from yolla_voice import AsyncYollaVoice, YollaVoice, errors, models, pagination, webhooks
 from yolla_voice.errors import ServerError
 
 
@@ -271,7 +271,8 @@ def test_root_exports_public_clients_models_errors_and_pagination():
         set(models.__all__)
         | set(errors.__all__)
         | set(pagination.__all__)
-        | {"AsyncYollaVoice", "YollaVoice", "CreateCallResult", "__version__"}
+        | set(webhooks.__all__)
+        | {"AsyncYollaVoice", "YollaVoice", "CreateCallResult", "__version__", "webhooks"}
     )
 
     assert set(yolla_voice.__all__) == expected

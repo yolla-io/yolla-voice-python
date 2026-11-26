@@ -9,6 +9,7 @@ from ._http.client import AsyncHttpClient, HttpClient, HttpConfig
 from .resources.balance import AsyncBalanceResource, BalanceResource
 from .resources.calls import AsyncCalls, Calls
 from .resources.pricing import AsyncPricing, Pricing
+from .webhooks import Webhooks
 
 
 def _required_option(explicit: str | None, option: str, environment: str) -> str:
@@ -49,6 +50,7 @@ class YollaVoice:
         self.calls = Calls(self._http)
         self.balance = BalanceResource(self._http)
         self.pricing = Pricing(self._http)
+        self.webhooks = Webhooks(self._webhook_secret)
 
     def __repr__(self) -> str:
         return (
@@ -98,6 +100,7 @@ class AsyncYollaVoice:
         self.calls = AsyncCalls(self._http)
         self.balance = AsyncBalanceResource(self._http)
         self.pricing = AsyncPricing(self._http)
+        self.webhooks = Webhooks(self._webhook_secret)
 
     def __repr__(self) -> str:
         return (

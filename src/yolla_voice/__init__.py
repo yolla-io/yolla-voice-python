@@ -1,3 +1,4 @@
+from . import webhooks as webhooks
 from ._version import __version__
 from .client import AsyncYollaVoice, YollaVoice
 from .errors import (
@@ -43,6 +44,17 @@ from .models import (
 )
 from .pagination import AsyncCallPage, CallPage, aiter_calls, iter_calls
 from .resources.calls import CreateCallResult
+from .webhooks import (
+    KnownWebhookEvent,
+    SignedWebhook,
+    UnknownWebhookEvent,
+    WebhookEvent,
+    Webhooks,
+    WebhookSecret,
+    parse_event,
+    sign_webhook,
+    verify_webhook,
+)
 
 __all__ = [
     "APIConnectionError",
@@ -70,6 +82,7 @@ __all__ = [
     "GatewayResponse",
     "InsufficientBalanceError",
     "IntervalStats",
+    "KnownWebhookEvent",
     "Money",
     "NotFoundError",
     "NumberPrice",
@@ -80,14 +93,23 @@ __all__ = [
     "Rate",
     "RateLimitError",
     "ServerError",
+    "SignedWebhook",
     "TestEvent",
+    "UnknownWebhookEvent",
     "ValidationError",
+    "WebhookEvent",
+    "WebhookSecret",
     "WebhookVerificationError",
+    "Webhooks",
     "YollaVoice",
     "YollaVoiceError",
     "__version__",
     "aiter_calls",
     "error_from_response",
     "iter_calls",
+    "parse_event",
     "parse_retry_after",
+    "sign_webhook",
+    "verify_webhook",
+    "webhooks",
 ]
