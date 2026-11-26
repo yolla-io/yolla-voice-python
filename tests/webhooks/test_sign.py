@@ -3,6 +3,7 @@ import re
 import time
 
 import pytest
+from pydantic import BaseModel
 
 from yolla_voice.models import CreateCallRequest
 from yolla_voice.webhooks import sign_webhook, verify_webhook
@@ -11,6 +12,10 @@ TIMESTAMP = 1700000000
 SECRET = "whsec_test"
 BODY = b'{"id":"evt_test","type":"webhook.test","seq":0,"createdAt":"2026-11-23T10:15:00.000Z","data":{}}'
 SIGNATURE = "v1=7b6fdffeec4f9fb2759d6bcbd22d8c35a73435790b58617d5041b0f1df059a19"
+
+
+class NumericPayload(BaseModel):
+    value: float
 
 
 def test_known_vector_has_exact_bytes_headers_and_v1_lowercase_hex():
@@ -49,6 +54,24 @@ def test_model_serialization_uses_wire_aliases_and_excludes_unset_fields():
     assert json.loads(signed.body) == {"externalUserId": "user-1", "to": "14155550100"}
     assert b"external_user_id" not in signed.body
     assert b"maxDuration" not in signed.body
+
+
+@pytest.mark.parametrize("use_model", [False, True], ids=["mapping", "model"])
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "infinity", "negative-infinity"],
+)
+def test_non_finite_numbers_fail_during_signing(use_model, value):
+    payload = NumericPayload(value=value) if use_model else {"value": value}
+
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        sign_webhook(
+            payload,
+            secret=SECRET,
+            timestamp=TIMESTAMP,
+            delivery_id="dlv_deterministic",
+        )
 
 
 def test_string_and_equivalent_utf8_bytes_produce_the_same_signature():
@@ -97,15 +120,22 @@ def test_environment_secret_fallback(monkeypatch):
     assert event.id == "evt_test"
 
 
-@pytest.mark.parametrize("secret", [None, "", []])
-def test_missing_and_empty_secrets_fail_at_operation_creation(secret, monkeypatch):
+def test_missing_secret_fails_at_operation_creation(monkeypatch):
     monkeypatch.delenv("YOLLA_WEBHOOK_SECRET", raising=False)
 
     with pytest.raises(ValueError) as caught:
-        sign_webhook("{}", secret=secret)
+        sign_webhook("{}")
 
     assert "YOLLA_WEBHOOK_SECRET" in str(caught.value)
     assert SECRET not in str(caught.value)
+
+
+@pytest.mark.parametrize("secret", ["", []])
+def test_explicit_empty_secret_does_not_use_environment_for_signing(secret, monkeypatch):
+    monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", SECRET)
+
+    with pytest.raises(ValueError, match="non-empty"):
+        sign_webhook("{}", secret=secret)
 
 
 @pytest.mark.parametrize("secret", [(SECRET, ""), ("", SECRET), [SECRET, 1]])

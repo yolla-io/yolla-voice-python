@@ -41,7 +41,9 @@ def _payload_bytes(payload: WebhookPayload) -> bytes:
     else:
         raise TypeError("Webhook payload must be bytes, a UTF-8 string, a mapping, or a model")
     try:
-        serialized = json.dumps(serializable, ensure_ascii=False, separators=(",", ":"))
+        serialized = json.dumps(
+            serializable, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+        )
     except (TypeError, ValueError, RecursionError):
         raise TypeError("Webhook payload is not JSON serializable") from None
     return serialized.encode("utf-8")

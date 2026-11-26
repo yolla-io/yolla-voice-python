@@ -185,6 +185,14 @@ def test_parsed_mappings_and_lists_are_rejected_as_raw_bodies(body):
     assert "parsed" in str(caught.value)
 
 
+@pytest.mark.parametrize("secret", ["", []])
+def test_explicit_empty_secret_does_not_use_environment_for_verification(secret, monkeypatch):
+    monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", SECRET)
+
+    with pytest.raises(ValueError, match="non-empty"):
+        verify_webhook(BODY, headers_for(), secret=secret, now=TIMESTAMP)
+
+
 def test_negative_tolerance_fails_before_verification():
     with pytest.raises(ValueError, match="tolerance"):
         verify_webhook(BODY, headers_for(), secret=SECRET, tolerance=-1, now=TIMESTAMP)
