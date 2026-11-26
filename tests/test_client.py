@@ -115,15 +115,31 @@ def test_missing_api_key_names_option_and_environment(client_type, monkeypatch):
 
 
 @pytest.mark.parametrize("client_type", [YollaVoice, AsyncYollaVoice])
-def test_missing_base_url_does_not_leak_api_key(client_type, monkeypatch):
+@pytest.mark.parametrize("environment", [None, ""])
+def test_base_url_defaults_to_the_production_api(client_type, monkeypatch, environment):
+    if environment is None:
+        monkeypatch.delenv("YOLLA_BASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("YOLLA_BASE_URL", environment)
+
+    client = client_type(api_key="must-not-leak")
+
+    assert client._base_url == "https://platform.yolla.io/api"
+    assert "must-not-leak" not in repr(client)
+
+
+def test_default_base_url_reaches_the_transport(monkeypatch):
     monkeypatch.delenv("YOLLA_BASE_URL", raising=False)
+    seen = []
 
-    with pytest.raises(ValueError) as caught:
-        client_type(api_key="must-not-leak")
+    def handler(request):
+        seen.append(str(request.url))
+        return json_response(200, balance_payload())
 
-    assert "base_url" in str(caught.value)
-    assert "YOLLA_BASE_URL" in str(caught.value)
-    assert "must-not-leak" not in str(caught.value)
+    with YollaVoice(api_key="key", transport=httpx.MockTransport(handler)) as client:
+        client.balance.get()
+
+    assert seen == ["https://platform.yolla.io/api/v1/balance"]
 
 
 def test_sync_defaults_are_30_seconds_and_two_retries(monkeypatch):

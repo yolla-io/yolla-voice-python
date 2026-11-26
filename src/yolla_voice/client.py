@@ -11,6 +11,13 @@ from .resources.calls import AsyncCalls, Calls
 from .resources.pricing import AsyncPricing, Pricing
 from .webhooks import Webhooks
 
+DEFAULT_BASE_URL = "https://platform.yolla.io/api"
+
+
+def _base_url(explicit: str | None) -> str:
+    value = explicit if explicit is not None else os.environ.get("YOLLA_BASE_URL")
+    return (value or DEFAULT_BASE_URL).rstrip("/")
+
 
 def _required_option(explicit: str | None, option: str, environment: str) -> str:
     value = explicit if explicit is not None else os.environ.get(environment)
@@ -34,7 +41,7 @@ class YollaVoice:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         resolved_api_key = _required_option(api_key, "api_key", "YOLLA_API_KEY")
-        self._base_url = _required_option(base_url, "base_url", "YOLLA_BASE_URL").rstrip("/")
+        self._base_url = _base_url(base_url)
         self._webhook_secret = _webhook_secret(webhook_secret)
         self._timeout = timeout
         self._max_retries = max_retries
@@ -84,7 +91,7 @@ class AsyncYollaVoice:
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         resolved_api_key = _required_option(api_key, "api_key", "YOLLA_API_KEY")
-        self._base_url = _required_option(base_url, "base_url", "YOLLA_BASE_URL").rstrip("/")
+        self._base_url = _base_url(base_url)
         self._webhook_secret = _webhook_secret(webhook_secret)
         self._timeout = timeout
         self._max_retries = max_retries
@@ -123,4 +130,4 @@ class AsyncYollaVoice:
         await self.aclose()
 
 
-__all__ = ["AsyncYollaVoice", "YollaVoice"]
+__all__ = ["DEFAULT_BASE_URL", "AsyncYollaVoice", "YollaVoice"]
