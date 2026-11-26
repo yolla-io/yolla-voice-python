@@ -1,5 +1,6 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
+from .dispatch import AsyncWebhookDispatcher, WebhookDispatcher, WebhookResponse
 from .events import KnownWebhookEvent, UnknownWebhookEvent, WebhookEvent, parse_event
 from .secret import WebhookSecret
 from .sign import SignedWebhook, WebhookPayload, sign_webhook
@@ -31,6 +32,42 @@ class Webhooks:
             now=now,
         )
 
+    def create_dispatcher(
+        self,
+        *,
+        secret: WebhookSecret | None = None,
+        tolerance: float = DEFAULT_TOLERANCE,
+        on: Callable[[KnownWebhookEvent], object] | None = None,
+        on_unhandled: Callable[[UnknownWebhookEvent], object] | None = None,
+        on_error: Callable[[Exception], object] | None = None,
+    ) -> WebhookDispatcher:
+        resolved_secret = self._secret if secret is None else secret
+        return WebhookDispatcher(
+            secret=resolved_secret,
+            tolerance=tolerance,
+            on=on,
+            on_unhandled=on_unhandled,
+            on_error=on_error,
+        )
+
+    def create_async_dispatcher(
+        self,
+        *,
+        secret: WebhookSecret | None = None,
+        tolerance: float = DEFAULT_TOLERANCE,
+        on: Callable[[KnownWebhookEvent], object] | None = None,
+        on_unhandled: Callable[[UnknownWebhookEvent], object] | None = None,
+        on_error: Callable[[Exception], object] | None = None,
+    ) -> AsyncWebhookDispatcher:
+        resolved_secret = self._secret if secret is None else secret
+        return AsyncWebhookDispatcher(
+            secret=resolved_secret,
+            tolerance=tolerance,
+            on=on,
+            on_unhandled=on_unhandled,
+            on_error=on_error,
+        )
+
     def sign(
         self,
         payload: WebhookPayload,
@@ -49,10 +86,13 @@ class Webhooks:
 
 
 __all__ = [
+    "AsyncWebhookDispatcher",
     "KnownWebhookEvent",
     "SignedWebhook",
     "UnknownWebhookEvent",
+    "WebhookDispatcher",
     "WebhookEvent",
+    "WebhookResponse",
     "WebhookSecret",
     "Webhooks",
     "parse_event",

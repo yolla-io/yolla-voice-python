@@ -45,10 +45,13 @@ from .models import (
 from .pagination import AsyncCallPage, CallPage, aiter_calls, iter_calls
 from .resources.calls import CreateCallResult
 from .webhooks import (
+    AsyncWebhookDispatcher,
     KnownWebhookEvent,
     SignedWebhook,
     UnknownWebhookEvent,
+    WebhookDispatcher,
     WebhookEvent,
+    WebhookResponse,
     Webhooks,
     WebhookSecret,
     parse_event,
@@ -60,6 +63,7 @@ __all__ = [
     "APIConnectionError",
     "APITimeoutError",
     "AsyncCallPage",
+    "AsyncWebhookDispatcher",
     "AsyncYollaVoice",
     "AuthenticationError",
     "Balance",
@@ -97,7 +101,9 @@ __all__ = [
     "TestEvent",
     "UnknownWebhookEvent",
     "ValidationError",
+    "WebhookDispatcher",
     "WebhookEvent",
+    "WebhookResponse",
     "WebhookSecret",
     "WebhookVerificationError",
     "Webhooks",
