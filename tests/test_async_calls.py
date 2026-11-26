@@ -263,3 +263,78 @@ async def test_malformed_success_becomes_invalid_response_with_metadata(client_f
     assert caught.value.code == "invalid_response"
     assert caught.value.status == 200
     assert caught.value.request_id == "request-invalid"
+
+
+@pytest.mark.parametrize("field", ["from_", "to"])
+async def test_list_rejects_naive_datetimes_before_io(client_factory, field):
+    seen = []
+    client = client_factory(lambda request: seen.append(request))
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        await client.calls.list(**{field: datetime(2026, 11, 25, 12, 0)})
+
+    assert seen == []
+
+
+async def test_create_serializes_extra_fields_as_json(client_factory):
+    seen = []
+
+    def handler(request):
+        seen.append(json.loads(request.content))
+        return json_response(201, create_payload())
+
+    client = client_factory(handler)
+    request = CreateCallRequest.model_validate(
+        {
+            "to": "14155550100",
+            "externalUserId": "user-1",
+            "scheduledAt": datetime(2026, 11, 25, 12, 0, tzinfo=UTC),
+        }
+    )
+    await client.calls.create(request, idempotency_key="key-1")
+
+    assert seen[0]["scheduledAt"] == "2026-11-25T12:00:00Z"
+
+
+@pytest.mark.parametrize(("action", "attempts"), [("hold", 1), ("unhold", 1), ("end", 3)])
+async def test_call_actions_retry_transport_errors_only_when_repeatable(
+    client_factory, monkeypatch, action, attempts
+):
+    seen = []
+
+    async def no_sleep(delay):
+        return None
+
+    monkeypatch.setattr(http_module, "async_sleep", no_sleep)
+
+    def handler(request):
+        seen.append(request)
+        raise httpx.ReadTimeout("lost response")
+
+    client = client_factory(handler)
+    with pytest.raises(YollaVoiceError):
+        await getattr(client.calls, action)("call-1")
+
+    assert len(seen) == attempts
+
+
+@pytest.mark.parametrize("action", ["hold", "unhold"])
+async def test_hold_actions_retry_unavailable_responses(client_factory, monkeypatch, action):
+    seen = []
+
+    async def no_sleep(delay):
+        return None
+
+    monkeypatch.setattr(http_module, "async_sleep", no_sleep)
+
+    def handler(request):
+        seen.append(request)
+        if len(seen) == 1:
+            return json_response(503, {"error": {"code": "unavailable", "message": "Retry"}})
+        return json_response(200, call_payload())
+
+    client = client_factory(handler)
+    call = await getattr(client.calls, action)("call-1")
+
+    assert call.id == "call-1"
+    assert len(seen) == 2

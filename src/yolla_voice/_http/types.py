@@ -13,6 +13,8 @@ class RequestSpec:
     body: Any | None = None
     headers: Mapping[str, str] | None = None
     retryable: bool = True
+    # False when a lost response may hide a processed, non-repeatable state change.
+    retry_transport_errors: bool = True
 
 
 @dataclass(frozen=True)

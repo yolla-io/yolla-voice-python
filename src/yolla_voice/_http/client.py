@@ -95,6 +95,10 @@ def _can_retry(spec: RequestSpec, attempt: int, max_retries: int) -> bool:
     return spec.retryable and attempt < max_retries
 
 
+def _can_retry_transport_error(spec: RequestSpec, attempt: int, max_retries: int) -> bool:
+    return spec.retry_transport_errors and _can_retry(spec, attempt, max_retries)
+
+
 def _can_retry_response(spec: RequestSpec, attempt: int, max_retries: int, status: int) -> bool:
     return _can_retry(spec, attempt, max_retries) and (status == 429 or 500 <= status <= 599)
 
@@ -108,7 +112,7 @@ def _connection_retry_delay(attempt: int) -> float:
     return retry_delay(attempt, None, random())
 
 
-def _connection_error(error: httpx.RequestError) -> APIConnectionError:
+def _connection_error(error: httpx.TransportError) -> APIConnectionError:
     if isinstance(error, httpx.TimeoutException):
         return APITimeoutError()
     return APIConnectionError()
@@ -146,13 +150,13 @@ class HttpClient:
                     headers=_headers(self._config, spec),
                     timeout=request_timeout,
                 )
-            except (httpx.TimeoutException, httpx.NetworkError) as error:
-                if not _can_retry(spec, attempt, retries):
+            except httpx.TransportError as error:
+                if not _can_retry_transport_error(spec, attempt, retries):
                     raise _connection_error(error) from error
                 sleep(_connection_retry_delay(attempt))
                 continue
 
-            if response.status_code < 400:
+            if 200 <= response.status_code < 300:
                 return _successful_response(response)
 
             response_error = _response_error(response)
@@ -201,13 +205,13 @@ class AsyncHttpClient:
                     headers=_headers(self._config, spec),
                     timeout=request_timeout,
                 )
-            except (httpx.TimeoutException, httpx.NetworkError) as error:
-                if not _can_retry(spec, attempt, retries):
+            except httpx.TransportError as error:
+                if not _can_retry_transport_error(spec, attempt, retries):
                     raise _connection_error(error) from error
                 await async_sleep(_connection_retry_delay(attempt))
                 continue
 
-            if response.status_code < 400:
+            if 200 <= response.status_code < 300:
                 return _successful_response(response)
 
             response_error = _response_error(response)

@@ -32,12 +32,20 @@ def _query(
     values = {
         "status": str(status) if status is not None else None,
         "externalUserId": external_user_id,
-        "from": from_.isoformat() if isinstance(from_, datetime) else from_,
-        "to": to.isoformat() if isinstance(to, datetime) else to,
+        "from": _timestamp("from_", from_),
+        "to": _timestamp("to", to),
         "limit": limit,
         "cursor": cursor,
     }
     return {key: value for key, value in values.items() if value is not None}
+
+
+def _timestamp(name: str, value: datetime | str | None) -> str | None:
+    if not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{name} must be a timezone-aware datetime")
+    return value.isoformat()
 
 
 def _idempotency_key(value: str | None) -> str:
@@ -64,7 +72,7 @@ class Calls:
             RequestSpec(
                 method="POST",
                 path="/v1/calls",
-                body=request.model_dump(by_alias=True, exclude_unset=True),
+                body=request.model_dump(mode="json", by_alias=True, exclude_unset=True),
                 headers={"Idempotency-Key": key},
             ),
             timeout=timeout,
@@ -196,6 +204,9 @@ class Calls:
             RequestSpec(
                 method="POST",
                 path=f"/v1/calls/{path_param(call_id)}/{action}",
+                # A lost hold/unhold response may hide an applied transition, and a blind
+                # retry would then fail with 409. Error responses (429/5xx) still retry.
+                retry_transport_errors=action == "end",
             ),
             timeout=timeout,
             max_retries=max_retries,
@@ -220,7 +231,7 @@ class AsyncCalls:
             RequestSpec(
                 method="POST",
                 path="/v1/calls",
-                body=request.model_dump(by_alias=True, exclude_unset=True),
+                body=request.model_dump(mode="json", by_alias=True, exclude_unset=True),
                 headers={"Idempotency-Key": key},
             ),
             timeout=timeout,
@@ -353,6 +364,9 @@ class AsyncCalls:
             RequestSpec(
                 method="POST",
                 path=f"/v1/calls/{path_param(call_id)}/{action}",
+                # A lost hold/unhold response may hide an applied transition, and a blind
+                # retry would then fail with 409. Error responses (429/5xx) still retry.
+                retry_transport_errors=action == "end",
             ),
             timeout=timeout,
             max_retries=max_retries,

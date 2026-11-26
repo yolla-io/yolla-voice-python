@@ -266,6 +266,9 @@ async def test_500_retries_use_full_jitter_and_preserve_idempotency_key(
     [
         (httpx.ConnectError, APIConnectionError),
         (httpx.ReadTimeout, APITimeoutError),
+        (httpx.RemoteProtocolError, APIConnectionError),
+        (httpx.ProxyError, APIConnectionError),
+        (httpx.UnsupportedProtocol, APIConnectionError),
     ],
 )
 async def test_network_and_timeout_errors_retry_and_preserve_final_cause(
@@ -336,7 +339,7 @@ async def test_retry_can_return_later_success(client_factory, monkeypatch):
     assert len(calls) == 2
 
 
-async def test_redirect_is_not_followed(client_factory):
+async def test_redirect_is_not_followed_and_is_an_error(client_factory):
     calls = []
 
     def handler(request):
@@ -344,10 +347,10 @@ async def test_redirect_is_not_followed(client_factory):
         return httpx.Response(302, headers={"Location": "https://other.example/calls"})
 
     client = client_factory(handler)
-    response = await client.request(RequestSpec("GET", "/calls"))
+    with pytest.raises(YollaVoiceError) as caught:
+        await client.request(RequestSpec("GET", "/calls"))
 
-    assert response.status == 302
-    assert response.data is None
+    assert caught.value.status == 302
     assert len(calls) == 1
 
 
@@ -471,3 +474,40 @@ async def test_request_rejects_invalid_retry_count_before_io(
         await client.request(RequestSpec("GET", "/calls"), max_retries=max_retries)
 
     assert calls == []
+
+
+async def test_disabled_transport_retries_stop_after_one_attempt(client_factory):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        raise httpx.ReadTimeout("lost response")
+
+    client = client_factory(handler)
+    with pytest.raises(APITimeoutError):
+        await client.request(RequestSpec("POST", "/calls/1/hold", retry_transport_errors=False))
+
+    assert len(calls) == 1
+
+
+async def test_disabled_transport_retries_still_retry_error_responses(client_factory, monkeypatch):
+    calls = []
+
+    async def no_sleep(delay):
+        return None
+
+    monkeypatch.setattr(client_module, "async_sleep", no_sleep)
+
+    def handler(request):
+        calls.append(request)
+        if len(calls) == 1:
+            return json_response(503, error_body())
+        return json_response(200, {"id": "call-1"})
+
+    client = client_factory(handler)
+    response = await client.request(
+        RequestSpec("POST", "/calls/1/hold", retry_transport_errors=False)
+    )
+
+    assert response.status == 200
+    assert len(calls) == 2
