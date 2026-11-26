@@ -15,8 +15,7 @@ DEFAULT_BASE_URL = "https://platform.yolla.io/api"
 
 
 def _base_url(explicit: str | None) -> str:
-    value = explicit if explicit is not None else os.environ.get("YOLLA_BASE_URL")
-    return (value or DEFAULT_BASE_URL).rstrip("/")
+    return (explicit or DEFAULT_BASE_URL).rstrip("/")
 
 
 def _required_option(explicit: str | None, option: str, environment: str) -> str:

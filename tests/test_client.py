@@ -31,7 +31,7 @@ def error_response():
 
 def test_environment_fallback_and_explicit_precedence_are_observable(monkeypatch):
     monkeypatch.setenv("YOLLA_API_KEY", "environment-api-secret")
-    monkeypatch.setenv("YOLLA_BASE_URL", "https://environment.example.com/")
+    monkeypatch.setenv("YOLLA_BASE_URL", "https://ignored.example.com/")
     monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", "environment-webhook-secret")
     seen = []
 
@@ -49,7 +49,7 @@ def test_environment_fallback_and_explicit_precedence_are_observable(monkeypatch
     )
     explicit_client.balance.get()
 
-    assert str(seen[0].url) == "https://environment.example.com/v1/balance"
+    assert str(seen[0].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[0].headers["Authorization"] == "Bearer environment-api-secret"
     assert str(seen[1].url) == "https://explicit.example.com/v1/balance"
     assert seen[1].headers["Authorization"] == "Bearer explicit-api-secret"
@@ -69,7 +69,7 @@ def test_environment_fallback_and_explicit_precedence_are_observable(monkeypatch
 
 async def test_async_environment_fallback_and_explicit_precedence(monkeypatch):
     monkeypatch.setenv("YOLLA_API_KEY", "environment-api-secret")
-    monkeypatch.setenv("YOLLA_BASE_URL", "https://environment.example.com/")
+    monkeypatch.setenv("YOLLA_BASE_URL", "https://ignored.example.com/")
     monkeypatch.setenv("YOLLA_WEBHOOK_SECRET", "environment-webhook-secret")
     seen = []
 
@@ -87,7 +87,7 @@ async def test_async_environment_fallback_and_explicit_precedence(monkeypatch):
     )
     await explicit_client.balance.get()
 
-    assert str(seen[0].url) == "https://environment.example.com/v1/balance"
+    assert str(seen[0].url) == "https://platform.yolla.io/api/v1/balance"
     assert seen[0].headers["Authorization"] == "Bearer environment-api-secret"
     assert str(seen[1].url) == "https://explicit.example.com/v1/balance"
     assert seen[1].headers["Authorization"] == "Bearer explicit-api-secret"
@@ -105,7 +105,6 @@ async def test_async_environment_fallback_and_explicit_precedence(monkeypatch):
 @pytest.mark.parametrize("client_type", [YollaVoice, AsyncYollaVoice])
 def test_missing_api_key_names_option_and_environment(client_type, monkeypatch):
     monkeypatch.delenv("YOLLA_API_KEY", raising=False)
-    monkeypatch.delenv("YOLLA_BASE_URL", raising=False)
 
     with pytest.raises(ValueError) as caught:
         client_type(base_url="https://api.example.com")
@@ -115,21 +114,17 @@ def test_missing_api_key_names_option_and_environment(client_type, monkeypatch):
 
 
 @pytest.mark.parametrize("client_type", [YollaVoice, AsyncYollaVoice])
-@pytest.mark.parametrize("environment", [None, ""])
-def test_base_url_defaults_to_the_production_api(client_type, monkeypatch, environment):
-    if environment is None:
-        monkeypatch.delenv("YOLLA_BASE_URL", raising=False)
-    else:
-        monkeypatch.setenv("YOLLA_BASE_URL", environment)
+@pytest.mark.parametrize("base_url", [None, ""])
+def test_base_url_defaults_to_the_production_api(client_type, monkeypatch, base_url):
+    monkeypatch.setenv("YOLLA_BASE_URL", "https://ignored.example.com")
 
-    client = client_type(api_key="must-not-leak")
+    client = client_type(api_key="must-not-leak", base_url=base_url)
 
     assert client._base_url == "https://platform.yolla.io/api"
     assert "must-not-leak" not in repr(client)
 
 
-def test_default_base_url_reaches_the_transport(monkeypatch):
-    monkeypatch.delenv("YOLLA_BASE_URL", raising=False)
+def test_default_base_url_reaches_the_transport():
     seen = []
 
     def handler(request):
