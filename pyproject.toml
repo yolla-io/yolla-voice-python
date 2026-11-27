@@ -15,6 +15,12 @@ dependencies = [
     "pydantic>=2.10,<3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/yolla-io/yolla-voice-python#readme"
+Repository = "https://github.com/yolla-io/yolla-voice-python.git"
+Issues = "https://github.com/yolla-io/yolla-voice-python/issues"
+Changelog = "https://github.com/yolla-io/yolla-voice-python/blob/main/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
     "coverage>=7.6",
