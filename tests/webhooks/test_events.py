@@ -29,6 +29,7 @@ MONEY = {"amount": "1.25", "currency": "USD"}
     [
         ("webhook.test", {}, GeneratedTestEvent),
         ("call.completed", {"call": CALL}, CallEvent),
+        ("call.billed", {"call": CALL}, CallEvent),
         (
             "call.quality",
             {"callId": "call_1", "externalUserId": "user-1", "quality": {}},

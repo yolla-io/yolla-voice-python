@@ -48,7 +48,7 @@ def test_required_names_are_exported_from_the_package_root():
 
 
 def test_version_is_0_1_0():
-    assert yolla_voice.__version__ == "0.1.0"
+    assert yolla_voice.__version__ == "0.2.0"
 
 
 def test_client_constructors_have_identical_parameters_and_defaults():

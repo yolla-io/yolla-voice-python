@@ -7,6 +7,7 @@ import pytest
 import yolla_voice
 from yolla_voice import YollaVoice
 from yolla_voice.errors import WebhookVerificationError
+from yolla_voice.models import CallEvent
 from yolla_voice.webhooks import (
     AsyncWebhookDispatcher,
     UnknownWebhookEvent,
@@ -50,6 +51,35 @@ def test_known_event_dispatches_to_on_and_returns_received_response():
     assert [event.id for event in seen] == ["evt_test"]
     assert seen[0].type == "webhook.test"
     assert_response(response, 200, RECEIVED)
+
+
+BILLED_BODY = (
+    b'{"id":"evt_billed","type":"call.billed","seq":4,"createdAt":"2026-11-27T10:15:00.000Z",'
+    b'"data":{"call":{"id":"call_1","createdAt":"2026-11-27T10:00:00.000Z",'
+    b'"expiresAt":"2026-11-27T11:00:00.000Z","externalUserId":"user-1","from":"14155550199",'
+    b'"status":"completed","to":"14155550100"}}}'
+)
+
+
+def test_call_billed_dispatches_to_on_with_call_event():
+    seen = []
+    dispatcher = WebhookDispatcher(secret=SECRET, on={"call.billed": seen.append})
+
+    response = dispatcher.handle(*signed_request(BILLED_BODY))
+
+    assert [(e.id, e.type, e.seq) for e in seen] == [("evt_billed", "call.billed", 4)]
+    assert isinstance(seen[0], CallEvent)
+    assert_response(response, 200, RECEIVED)
+
+
+def test_call_billed_with_bad_signature_is_rejected_without_calling_handler():
+    seen = []
+    dispatcher = WebhookDispatcher(secret=SECRET, on={"call.billed": seen.append})
+
+    response = dispatcher.handle(*signed_request(BILLED_BODY, secret="whsec_other"))
+
+    assert seen == []
+    assert_response(response, 401, VERIFICATION_FAILED)
 
 
 def test_unknown_event_dispatches_only_to_on_unhandled():

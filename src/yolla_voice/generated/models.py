@@ -45,6 +45,7 @@ class Type(OpenEnum):
     call_unheld = "call.unheld"
     call_hold_failed = "call.hold_failed"
     call_completed = "call.completed"
+    call_billed = "call.billed"
     call_expired = "call.expired"
 
 

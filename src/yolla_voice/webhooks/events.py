@@ -18,6 +18,7 @@ _CALL_EVENT_TYPES = {
     "call.unheld",
     "call.hold_failed",
     "call.completed",
+    "call.billed",
     "call.expired",
 }
 

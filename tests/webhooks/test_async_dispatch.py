@@ -1,6 +1,7 @@
 import time
 
 from yolla_voice import AsyncYollaVoice
+from yolla_voice.models import CallEvent
 from yolla_voice.webhooks import (
     AsyncWebhookDispatcher,
     UnknownWebhookEvent,
@@ -32,6 +33,39 @@ def assert_response(response, status, body):
     assert response.headers["Content-Type"] == "application/json"
     assert response.body == body
     assert isinstance(response.body, bytes)
+
+
+BILLED_BODY = (
+    b'{"id":"evt_billed","type":"call.billed","seq":4,"createdAt":"2026-11-27T10:15:00.000Z",'
+    b'"data":{"call":{"id":"call_1","createdAt":"2026-11-27T10:00:00.000Z",'
+    b'"expiresAt":"2026-11-27T11:00:00.000Z","externalUserId":"user-1","from":"14155550199",'
+    b'"status":"completed","to":"14155550100"}}}'
+)
+
+
+async def test_async_call_billed_callback_is_awaited():
+    seen = []
+
+    async def callback(event):
+        seen.append(event)
+
+    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on={"call.billed": callback})
+
+    response = await dispatcher.handle(*signed_request(BILLED_BODY))
+
+    assert [(e.id, e.type, e.seq) for e in seen] == [("evt_billed", "call.billed", 4)]
+    assert isinstance(seen[0], CallEvent)
+    assert_response(response, 200, RECEIVED)
+
+
+async def test_async_call_billed_with_bad_signature_is_rejected():
+    seen = []
+    dispatcher = AsyncWebhookDispatcher(secret=SECRET, on={"call.billed": seen.append})
+
+    response = await dispatcher.handle(*signed_request(BILLED_BODY, secret="whsec_other"))
+
+    assert seen == []
+    assert_response(response, 401, VERIFICATION_FAILED)
 
 
 async def test_async_known_event_callback_is_awaited():

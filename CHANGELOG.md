@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-11-27
+
+- Added the `call.billed` webhook event, delivered as a `CallEvent` once per call after `call.completed`
+  with the final `price` and `billed_duration`.
+- Refreshed the contract snapshot and generated models.
+
 ## 0.1.0
 
 Initial release.

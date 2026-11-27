@@ -353,8 +353,12 @@ else:
 ### Events
 
 `call.initiated`, `call.answered`, `call.held`, `call.unheld`, `call.hold_failed`, `call.completed`,
-`call.expired` (all `CallEvent`), `call.quality` (`QualityEvent`), `balance.low` (`BalanceEvent`),
+`call.billed`, `call.expired` (all `CallEvent`), `call.quality` (`QualityEvent`), `balance.low` (`BalanceEvent`),
 `webhook.test` (`TestEvent`). Any other type arrives as `UnknownWebhookEvent`.
+
+`call.billed` arrives once per call after `call.completed`, when the final billing record is applied.
+Its `data.call` has the same shape as in `call.completed`, and its `price` and `billed_duration` are final.
+Its `seq` continues the call's status numbering.
 
 Every event has `id`, `type`, `seq`, `created_at` and `data`.
 
