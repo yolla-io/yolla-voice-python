@@ -1,6 +1,6 @@
 #!/bin/sh
 # Pushes a commit to the public GitHub repository without coding-agent files (CLAUDE.md, AGENTS.md and the like)
-# and without Co-Authored-By trailers in commit messages.
+# and without Co-Authored-By trailers; every commit gets one neutral author, "Yolla <noreply@yolla.io>".
 # The rewrite is deterministic, so exporting the same history again gives the same commits and a plain push works.
 # Usage: scripts/github-export.sh <commit> <target ref> <remote url>
 set -eu
@@ -10,7 +10,11 @@ target=$2
 remote=$3
 
 git branch -f github-export "$commit"
-FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --prune-empty --msg-filter '
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --prune-empty --env-filter '
+  GIT_AUTHOR_NAME=Yolla GIT_AUTHOR_EMAIL=noreply@yolla.io
+  GIT_COMMITTER_NAME=Yolla GIT_COMMITTER_EMAIL=noreply@yolla.io
+  export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+' --msg-filter '
   awk '"'"'tolower($0) ~ /^co-authored-by:/ { next }
     { line[++n] = $0 }
     END { while (n > 0 && line[n] == "") n--; for (i = 1; i <= n; i++) print line[i] }'"'"'
