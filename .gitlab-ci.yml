@@ -1,0 +1,25 @@
+stages:
+  - sync
+
+# Pushes main and release tags to the public GitHub repository without coding-agent files and Co-Authored-By
+# trailers (scripts/github-export.sh). GitHub runs the checks, and its Release workflow publishes to PyPI.
+# GITHUB_PUSH_TOKEN: a fine-grained token for that repository with Contents and Workflows set to read and write.
+# Store it as a masked, protected variable; protect main and the v* tags so this job can read it.
+github:
+  stage: sync
+  image: $DOCKER_REGISTRY/library/python:3.12
+  variables:
+    GIT_DEPTH: 0
+    GITHUB_REPO: github.com/yolla-io/yolla-voice-python.git
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  script:
+    - test -n "$GITHUB_PUSH_TOKEN" || { echo "GITHUB_PUSH_TOKEN is not set" >&2; exit 1; }
+    - remote="https://x-access-token:${GITHUB_PUSH_TOKEN}@${GITHUB_REPO}"
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        sh scripts/github-export.sh "$CI_COMMIT_SHA" "refs/tags/$CI_COMMIT_TAG" "$remote"
+      else
+        sh scripts/github-export.sh "$CI_COMMIT_SHA" refs/heads/main "$remote"
+      fi
